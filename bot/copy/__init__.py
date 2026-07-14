@@ -42,6 +42,14 @@ class Copy:
     btn_invite: str
     btn_share: str
     btn_buy_credits: str
+    btn_style_guide: str
+
+    style_guide_offer: str
+    style_guide_generating: str
+    style_guide_caption: str
+    style_guide_already: str
+    style_guide_failed: str
+    style_guide_not_found: str
     shop_most_chosen: str
 
     help_text: str

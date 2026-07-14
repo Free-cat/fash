@@ -69,6 +69,21 @@ COPY = Copy(
     btn_invite="💫 Invite friends",
     btn_share="📤 Share with friends",
     btn_buy_credits="⭐ Buy credits",
+    btn_style_guide="✨ What to pair with this",
+    style_guide_offer=(
+        "Love this look? 🔥 Get a style board for this piece — "
+        "what to pair, colors & accessories. *1 try-on.*"
+    ),
+    style_guide_generating="Putting your style board together… about 20 sec ✨",
+    style_guide_caption="Your style board — pairings, colors & accessories for this look 👗",
+    style_guide_already="You've already got a style board for this look 👇",
+    style_guide_failed=(
+        "That one didn't come through — and I've refunded your try-on. "
+        "Mind giving it another go?"
+    ),
+    style_guide_not_found=(
+        "I can't find that try-on anymore. Send a clothing photo and let's style something new 👗"
+    ),
     shop_most_chosen="Most chosen",
     help_text=(
         "How FitRoom works:\n"

@@ -68,6 +68,21 @@ COPY = Copy(
     btn_invite="💫 Пригласить друзей",
     btn_share="📤 Поделиться с друзьями",
     btn_buy_credits="⭐ Купить кредиты",
+    btn_style_guide="✨ What to pair with this",
+    style_guide_offer=(
+        "Love this look? 🔥 Get a style board for this piece — "
+        "what to pair, colors & accessories. *1 try-on.*"
+    ),
+    style_guide_generating="Putting your style board together… about 20 sec ✨",
+    style_guide_caption="Your style board — pairings, colors & accessories for this look 👗",
+    style_guide_already="You've already got a style board for this look 👇",
+    style_guide_failed=(
+        "That one didn't come through — and I've refunded your try-on. "
+        "Mind giving it another go?"
+    ),
+    style_guide_not_found=(
+        "I can't find that try-on anymore. Send a clothing photo and let's style something new 👗"
+    ),
     shop_most_chosen="Популярный выбор",
     help_text=(
         "Как работает Моя примерка:\n"

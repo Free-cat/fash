@@ -7,12 +7,15 @@ from bot.handlers.tryon import build_result_message
 def test_result_message_merges_low_balance_into_caption():
     init_copy("en")
 
-    caption, keyboard = build_result_message(remaining=1, total_purchases=0)
+    caption, keyboard = build_result_message(
+        remaining=1, total_purchases=0, generation_id=1
+    )
 
     assert "This is *you* in that outfit 🔥" in caption
     assert "1 try-on(s) left — make them count" in caption
     assert isinstance(keyboard, InlineKeyboardMarkup)
-    assert len(keyboard.inline_keyboard) == 3
+    assert len(keyboard.inline_keyboard) == 4
+    assert keyboard.inline_keyboard[0][0].callback_data == "styleguide:1"
 
 
 def test_result_message_paywall_uses_shop_keyboard():
