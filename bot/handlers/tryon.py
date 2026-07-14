@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 
 from aiogram import Bot, F, Router
@@ -9,6 +10,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardMarkup
 from bot.copy import active_copy
 from bot.db.database import Database
 from bot.handlers.photos import Onboarding, Reupload
+from bot.handlers.styleguide import schedule_style_guide_offer
 from bot.filters import TextIs
 from bot.keyboards import (
     deficit_keyboard,
@@ -242,6 +244,11 @@ async def try_on_garment(
             caption=caption,
             parse_mode="Markdown",
             reply_markup=keyboard,
+        )
+        asyncio.create_task(
+            schedule_style_guide_offer(
+                bot, db, message.from_user.id, gen_id, remaining
+            )
         )
     finally:
         await guard.release(message.from_user.id)
