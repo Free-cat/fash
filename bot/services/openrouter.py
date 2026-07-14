@@ -410,6 +410,13 @@ class FileStorage:
         path.write_bytes(data)
         return path
 
+    def save_style_guide_photo(
+        self, telegram_id: int, generation_id: int, data: bytes
+    ) -> Path:
+        path = self.user_dir(telegram_id) / f"style_guide_{generation_id}.jpg"
+        path.write_bytes(data)
+        return path
+
     def read(self, path: str | Path) -> bytes:
         return Path(path).read_bytes()
 
