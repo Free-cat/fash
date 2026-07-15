@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import aiosqlite
 from pathlib import Path
 
@@ -62,6 +64,7 @@ class Database:
                 pass
         await self._conn.executescript(NEW_TABLES)
         await self._conn.commit()
+        await self.backfill_active_photos()
 
     async def close(self) -> None:
         if self._conn:
@@ -108,19 +111,86 @@ class Database:
         return int(row["cnt"])
 
     async def add_user_photo(self, user_id: int, path: str) -> int:
-        cursor = await self.conn.execute(
-            "INSERT INTO user_photos (user_id, path) VALUES (?, ?)",
-            (user_id, path),
+        count = await self.count_user_photos(user_id)
+        slot_index = count + 1
+        await self.conn.execute(
+            "UPDATE user_photos SET is_active = 0 WHERE user_id = ?",
+            (user_id,),
         )
-        photo_id = cursor.lastrowid
+        cursor = await self.conn.execute(
+            """
+            INSERT INTO user_photos (user_id, path, is_active, slot_index)
+            VALUES (?, ?, 1, ?)
+            """,
+            (user_id, path, slot_index),
+        )
+        photo_id = int(cursor.lastrowid)
         await self.conn.execute(
             "UPDATE users SET primary_photo_id = ? WHERE id = ?",
             (photo_id, user_id),
         )
         await self.conn.commit()
-        return int(photo_id)
+        return photo_id
 
-    async def get_primary_photo_path(self, user_id: int) -> str | None:
+    async def list_user_photos(self, user_id: int) -> list[aiosqlite.Row]:
+        cursor = await self.conn.execute(
+            """
+            SELECT * FROM user_photos
+            WHERE user_id = ?
+            ORDER BY slot_index
+            """,
+            (user_id,),
+        )
+        return await cursor.fetchall()
+
+    async def get_active_photo(self, user_id: int) -> aiosqlite.Row | None:
+        cursor = await self.conn.execute(
+            "SELECT * FROM user_photos WHERE user_id = ? AND is_active = 1",
+            (user_id,),
+        )
+        return await cursor.fetchone()
+
+    async def set_active_photo(self, photo_id: int, user_id: int) -> bool:
+        cursor = await self.conn.execute(
+            "SELECT id FROM user_photos WHERE id = ? AND user_id = ?",
+            (photo_id, user_id),
+        )
+        if not await cursor.fetchone():
+            return False
+        await self.conn.execute(
+            "UPDATE user_photos SET is_active = 0 WHERE user_id = ?",
+            (user_id,),
+        )
+        await self.conn.execute(
+            "UPDATE user_photos SET is_active = 1 WHERE id = ? AND user_id = ?",
+            (photo_id, user_id),
+        )
+        await self.conn.execute(
+            "UPDATE users SET primary_photo_id = ? WHERE id = ?",
+            (photo_id, user_id),
+        )
+        await self.conn.commit()
+        return True
+
+    async def backfill_active_photos(self) -> None:
+        await self.conn.execute(
+            """
+            UPDATE user_photos SET is_active = 1
+            WHERE id IN (
+                SELECT primary_photo_id FROM users WHERE primary_photo_id IS NOT NULL
+            )
+            """
+        )
+        await self.conn.commit()
+
+    async def get_active_photo_path(self, user_id: int) -> str | None:
+        cursor = await self.conn.execute(
+            "SELECT path FROM user_photos WHERE user_id = ? AND is_active = 1",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+        if row:
+            return row["path"]
         cursor = await self.conn.execute(
             """
             SELECT p.path
@@ -132,6 +202,50 @@ class Database:
         )
         row = await cursor.fetchone()
         return row["path"] if row else None
+
+    async def get_primary_photo_path(self, user_id: int) -> str | None:
+        return await self.get_active_photo_path(user_id)
+
+    async def get_look_cart(self, user_id: int) -> list[str]:
+        cursor = await self.conn.execute(
+            "SELECT garment_paths FROM look_carts WHERE user_id = ?",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return []
+        return json.loads(row["garment_paths"])
+
+    async def set_look_cart(self, user_id: int, paths: list[str]) -> None:
+        await self.conn.execute(
+            """
+            INSERT INTO look_carts (user_id, garment_paths, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(user_id) DO UPDATE SET
+                garment_paths = excluded.garment_paths,
+                updated_at = datetime('now')
+            """,
+            (user_id, json.dumps(paths)),
+        )
+        await self.conn.commit()
+
+    async def clear_look_cart(self, user_id: int) -> None:
+        await self.conn.execute(
+            "DELETE FROM look_carts WHERE user_id = ?",
+            (user_id,),
+        )
+        await self.conn.commit()
+
+    async def purge_stale_look_carts(self, max_age_hours: int = 24) -> int:
+        cursor = await self.conn.execute(
+            """
+            DELETE FROM look_carts
+            WHERE updated_at < datetime('now', ?)
+            """,
+            (f"-{max_age_hours} hours",),
+        )
+        await self.conn.commit()
+        return cursor.rowcount
 
     async def set_onboarding_complete(self, user_id: int) -> None:
         await self.conn.execute(

@@ -9,6 +9,10 @@ MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN paywall_shown_at TEXT",
     "ALTER TABLE generations ADD COLUMN style_guide_path TEXT",
     "ALTER TABLE generations ADD COLUMN style_guide_at TEXT",
+    "ALTER TABLE user_photos ADD COLUMN is_active INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE user_photos ADD COLUMN slot_index INTEGER",
+    "ALTER TABLE generations ADD COLUMN garment_count INTEGER NOT NULL DEFAULT 1",
+    "ALTER TABLE generations ADD COLUMN mode TEXT NOT NULL DEFAULT 'cart'",
 ]
 
 NEW_TABLES = """
@@ -41,5 +45,12 @@ CREATE TABLE IF NOT EXISTS referrals (
 CREATE TABLE IF NOT EXISTS generation_locks (
     telegram_id INTEGER PRIMARY KEY,
     started_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS look_carts (
+    user_id INTEGER PRIMARY KEY,
+    garment_paths TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 """
