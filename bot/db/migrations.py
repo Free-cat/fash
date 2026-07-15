@@ -13,6 +13,11 @@ MIGRATIONS = [
     "ALTER TABLE user_photos ADD COLUMN slot_index INTEGER",
     "ALTER TABLE generations ADD COLUMN garment_count INTEGER NOT NULL DEFAULT 1",
     "ALTER TABLE generations ADD COLUMN mode TEXT NOT NULL DEFAULT 'cart'",
+    "ALTER TABLE users ADD COLUMN premium_offer_variant INTEGER",
+    "ALTER TABLE users ADD COLUMN premium_offer_shown_once INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN premium_offer_ignored_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN premium_offer_paused_until TEXT",
+    "ALTER TABLE users ADD COLUMN premium_offer_last_shown_at TEXT",
 ]
 
 NEW_TABLES = """
@@ -52,5 +57,11 @@ CREATE TABLE IF NOT EXISTS look_carts (
     garment_paths TEXT NOT NULL,
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS bot_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 """

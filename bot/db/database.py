@@ -270,6 +270,90 @@ class Database:
         await self.conn.commit()
         return cursor.rowcount > 0
 
+    async def deduct_credits(self, telegram_id: int, amount: int) -> bool:
+        cursor = await self.conn.execute(
+            """
+            UPDATE users
+            SET balance = balance - ?
+            WHERE telegram_id = ? AND balance >= ?
+            """,
+            (amount, telegram_id, amount),
+        )
+        await self.conn.commit()
+        return cursor.rowcount > 0
+
+    async def get_premium_offer_state(self, telegram_id: int) -> dict:
+        row = await self.fetch_user(telegram_id)
+        if not row:
+            return {}
+        return {
+            "premium_offer_variant": row["premium_offer_variant"],
+            "premium_offer_shown_once": int(row["premium_offer_shown_once"] or 0),
+            "premium_offer_ignored_count": int(row["premium_offer_ignored_count"] or 0),
+            "premium_offer_paused_until": row["premium_offer_paused_until"],
+            "premium_offer_last_shown_at": row["premium_offer_last_shown_at"],
+        }
+
+    async def assign_premium_offer_variant(self, telegram_id: int, variant: int) -> None:
+        await self.conn.execute(
+            """
+            UPDATE users
+            SET premium_offer_variant = ?
+            WHERE telegram_id = ? AND premium_offer_variant IS NULL
+            """,
+            (variant, telegram_id),
+        )
+        await self.conn.commit()
+
+    async def mark_premium_offer_shown(self, telegram_id: int) -> None:
+        await self.conn.execute(
+            """
+            UPDATE users
+            SET premium_offer_shown_once = 1,
+                premium_offer_last_shown_at = datetime('now')
+            WHERE telegram_id = ?
+            """,
+            (telegram_id,),
+        )
+        await self.conn.commit()
+
+    async def increment_premium_offer_ignored(self, telegram_id: int) -> int:
+        await self.conn.execute(
+            """
+            UPDATE users
+            SET premium_offer_ignored_count = premium_offer_ignored_count + 1,
+                premium_offer_paused_until = CASE
+                    WHEN premium_offer_ignored_count + 1 >= 3
+                    THEN datetime('now', '+14 days')
+                    ELSE premium_offer_paused_until
+                END
+            WHERE telegram_id = ?
+            """,
+            (telegram_id,),
+        )
+        await self.conn.commit()
+        state = await self.get_premium_offer_state(telegram_id)
+        return state["premium_offer_ignored_count"]
+
+    async def reset_premium_offer_ignored(self, telegram_id: int) -> None:
+        await self.conn.execute(
+            """
+            UPDATE users
+            SET premium_offer_ignored_count = 0,
+                premium_offer_paused_until = NULL
+            WHERE telegram_id = ?
+            """,
+            (telegram_id,),
+        )
+        await self.conn.commit()
+
+    async def set_premium_offer_paused_until(self, telegram_id: int, until: str) -> None:
+        await self.conn.execute(
+            "UPDATE users SET premium_offer_paused_until = ? WHERE telegram_id = ?",
+            (until, telegram_id),
+        )
+        await self.conn.commit()
+
     async def add_credits(self, telegram_id: int, credits: int) -> None:
         await self.conn.execute(
             "UPDATE users SET balance = balance + ? WHERE telegram_id = ?",
@@ -503,6 +587,32 @@ class Database:
             "stars": stars,
             "conversion": conversion,
         }
+
+    async def get_bot_setting(self, key: str) -> str | None:
+        cursor = await self.conn.execute(
+            "SELECT value FROM bot_settings WHERE key = ?",
+            (key,),
+        )
+        row = await cursor.fetchone()
+        return row["value"] if row else None
+
+    async def set_bot_setting(self, key: str, value: str) -> None:
+        await self.conn.execute(
+            """
+            INSERT INTO bot_settings (key, value, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = datetime('now')
+            """,
+            (key, value),
+        )
+        await self.conn.commit()
+
+    async def clear_all_generation_locks(self) -> int:
+        cursor = await self.conn.execute("DELETE FROM generation_locks")
+        await self.conn.commit()
+        return cursor.rowcount
 
     async def count_generations(self, user_id: int) -> int:
         cursor = await self.conn.execute(
