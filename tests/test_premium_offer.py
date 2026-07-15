@@ -2,6 +2,28 @@ import pytest
 from bot.db.database import Database
 
 
+def test_assign_variant_is_stable():
+    from bot.services.premium_offer import assign_variant
+
+    assert assign_variant(12345) == assign_variant(12345)
+    assert assign_variant(12345) in (1, 2)
+
+
+def test_consume_ignore_only_once():
+    from bot.services.premium_offer import (
+        clear_pending,
+        consume_ignore_if_pending,
+        register_pending,
+    )
+
+    register_pending(99, 1)
+    assert consume_ignore_if_pending(99) is True
+    assert consume_ignore_if_pending(99) is False
+    clear_pending(99)
+    register_pending(99, 2)
+    assert consume_ignore_if_pending(99) is True
+
+
 @pytest.mark.asyncio
 async def test_deduct_credits_requires_full_balance(tmp_path):
     db = Database(tmp_path / "test.db")
