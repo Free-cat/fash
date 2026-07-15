@@ -9,7 +9,7 @@ from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardMarkup
 
 from bot.copy import active_copy
 from bot.db.database import Database
-from bot.handlers.photos import Onboarding, Reupload
+from bot.handlers.photos import Onboarding, PhotosAdding
 from bot.handlers.styleguide import schedule_style_guide_offer
 from bot.filters import TextIs
 from bot.keyboards import (
@@ -134,7 +134,7 @@ async def try_on_hint(message: Message, db: Database) -> None:
 @router.message(
     F.photo,
     ~StateFilter(Onboarding.collecting_photos),
-    ~StateFilter(Reupload.collecting_photos),
+    ~StateFilter(PhotosAdding.adding),
 )
 async def try_on_garment(
     message: Message,

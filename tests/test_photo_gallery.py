@@ -20,6 +20,18 @@ async def test_set_active_photo_only_one_active(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_list_user_photos_ordered_by_slot(tmp_path):
+    db = Database(tmp_path / "test.db")
+    await db.connect()
+    user_id = (await db.get_or_create_user(555, None, 2))["id"]
+    await db.add_user_photo(user_id, "/a.jpg")
+    await db.add_user_photo(user_id, "/b.jpg")
+    photos = await db.list_user_photos(user_id)
+    assert len(photos) == 2
+    assert photos[-1]["is_active"] == 1
+
+
+@pytest.mark.asyncio
 async def test_look_cart_roundtrip(tmp_path):
     db = Database(tmp_path / "test.db")
     await db.connect()
