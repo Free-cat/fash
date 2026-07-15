@@ -81,3 +81,20 @@ async def test_record_generation_garment_count_and_mode(tmp_path):
     assert row["garment_count"] == 2
     assert row["mode"] == "cart"
     await db.close()
+
+
+@pytest.mark.asyncio
+async def test_purge_stale_look_carts(tmp_path):
+    db = Database(tmp_path / "test.db")
+    await db.connect()
+    user_id = (await db.get_or_create_user(666, None, 2))["id"]
+    await db.set_look_cart(user_id, ["/g.jpg"])
+    await db.conn.execute(
+        "UPDATE look_carts SET updated_at = datetime('now', '-25 hours') WHERE user_id = ?",
+        (user_id,),
+    )
+    await db.conn.commit()
+    removed = await db.purge_stale_look_carts(max_age_hours=24)
+    assert removed == 1
+    assert await db.get_look_cart(user_id) == []
+    await db.close()

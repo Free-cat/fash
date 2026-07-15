@@ -46,6 +46,16 @@ async def purge_worker(db: Database, storage: FileStorage) -> None:
         await asyncio.sleep(PURGE_INTERVAL_SECONDS)
 
 
+async def look_cart_purge_worker(db: Database) -> None:
+    while True:
+        try:
+            removed = await db.purge_stale_look_carts(max_age_hours=24)
+            logger.info("Purged %d stale look cart(s)", removed)
+        except Exception:
+            logger.exception("Look cart purge worker error")
+        await asyncio.sleep(PURGE_INTERVAL_SECONDS)
+
+
 def _register_routers(dp: Dispatcher) -> None:
     dp.include_router(start.router)
     dp.include_router(guide.router)
@@ -133,6 +143,7 @@ async def main() -> None:
     worker_tasks = [
         asyncio.create_task(drip_worker(bot, drip)),
         asyncio.create_task(purge_worker(db, storage)),
+        asyncio.create_task(look_cart_purge_worker(db)),
     ]
 
     logger.info("Bot started (%s / locale=%s)", copy.brand_name, copy.locale)
