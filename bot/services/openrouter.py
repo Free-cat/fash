@@ -131,6 +131,135 @@ def build_tryon_prompt() -> str:
 TRYON_PROMPT = build_tryon_prompt()
 
 
+def build_outfit_tryon_prompt(garment_count: int) -> str:
+    """Structured JSON prompt for multi-garment outfit try-on via OpenRouter."""
+    garment_inputs = {
+        f"image_{i + 2}": f"garment / clothing item photo {i + 1} of {garment_count}"
+        for i in range(garment_count)
+    }
+    garment_refs = ", ".join(f"image_{i + 2}" for i in range(garment_count))
+    payload = {
+        "task": "virtual_try_on_outfit",
+        "role": "expert virtual stylist and photorealistic image compositor",
+        "inputs": {
+            "image_1": "person reference photo",
+            **garment_inputs,
+            "garment_count": garment_count,
+        },
+        "goal": (
+            f"Dress the person from image_1 in ALL {garment_count} garments "
+            f"({garment_refs}) as one cohesive outfit. "
+            "Output one photorealistic photo of that same person wearing the complete look."
+        ),
+        "identity_lock": {
+            "keep_exact": [
+                "face",
+                "facial_features",
+                "hair",
+                "skin_tone",
+                "body_shape",
+                "body_proportions",
+                "pose",
+                "stance",
+                "camera_angle",
+                "background",
+                "lighting_direction",
+            ],
+            "do_not": [
+                "change_identity",
+                "beautify_face",
+                "alter_age",
+                "change_gender_presentation",
+                "replace_background",
+            ],
+        },
+        "garment_rules": {
+            "apply": (
+                f"all {garment_count} clothing items onto the person from image_1 "
+                "as a single cohesive outfit"
+            ),
+            "infer_roles": [
+                "top",
+                "bottom",
+                "outerwear",
+                "dress",
+                "shoes",
+                "accessories",
+            ],
+            "no_duplicate_layers": (
+                "do not add extra layers beyond the provided garments "
+                "unless a garment clearly requires it"
+            ),
+            "match": [
+                "color",
+                "pattern",
+                "texture",
+                "silhouette",
+                "length",
+                "neckline",
+                "sleeves",
+                "fabric_drape",
+            ],
+            "fit": "natural body-conforming fit with realistic wrinkles and shadows",
+            "if_garment_on_model": (
+                "extract only the clothing; ignore the other person's body and face"
+            ),
+        },
+        "framing": {
+            "full_body": True,
+            "aspect_ratio": "3:4 portrait",
+            "requirements": [
+                "head_to_toe",
+                "entire_person_visible",
+                "include_feet_and_shoes",
+                "include_head_and_hair",
+                "no_cropped_legs",
+                "no_cropped_head",
+                "no_waist_up_crop",
+                "no_close_up",
+            ],
+            "camera": "same distance and framing as image_1, or slightly wider if needed to keep full body",
+        },
+        "quality": {
+            "style": "photorealistic fashion photo",
+            "lighting": "natural, consistent with image_1",
+            "details": [
+                "sharp fabric texture",
+                "realistic shadows under garment",
+                "correct perspective",
+                "no plastic skin",
+                "no warped limbs",
+                "no extra fingers",
+                "no text overlays",
+                "no watermarks",
+            ],
+        },
+        "output": {
+            "count": 1,
+            "type": "single_image",
+            "format": "photorealistic_outfit_try_on_result",
+            "mandatory": "full body of the person must be fully visible from head to toes",
+        },
+        "negative": [
+            "cropped legs",
+            "cut off feet",
+            "upper body only",
+            "waist up",
+            "portrait crop",
+            "close-up face",
+            "second person",
+            "mannequin",
+            "flat lay only",
+            "cartoon",
+            "anime",
+            "low resolution",
+            "blurry",
+            "distorted anatomy",
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
 def build_style_guide_prompt() -> str:
     """Structured JSON prompt for personal style guide board via OpenRouter."""
     payload = {
@@ -255,6 +384,45 @@ def build_tryon_request_payload(
     }
 
 
+def build_outfit_tryon_request_payload(
+    model: str,
+    person: bytes,
+    garments: list[bytes],
+) -> dict:
+    content: list[dict] = [
+        {"type": "text", "text": build_outfit_tryon_prompt(len(garments))},
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": _as_data_uri(person, "image/jpeg"),
+            },
+        },
+    ]
+    for garment in garments:
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": _as_data_uri(garment, "image/jpeg"),
+                },
+            }
+        )
+    return {
+        "model": model,
+        "modalities": ["image", "text"],
+        "image_config": {
+            "aspect_ratio": TRYON_ASPECT_RATIO,
+            "image_size": TRYON_IMAGE_SIZE,
+        },
+        "messages": [
+            {
+                "role": "user",
+                "content": content,
+            }
+        ],
+    }
+
+
 def build_style_guide_request_payload(
     model: str,
     result_image: bytes,
@@ -297,6 +465,36 @@ class OpenRouterClient:
     ) -> bytes:
         payload = build_tryon_request_payload(
             self.model, person_image, garment_image
+        )
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/primerka_bot",
+            "X-Title": "FitRoom Try-On Bot",
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                OPENROUTER_URL, json=payload, headers=headers, timeout=120
+            ) as response:
+                body = await response.json()
+                if response.status >= 400:
+                    message = body.get("error", {}).get("message", str(body))
+                    raise TryOnError(f"OpenRouter error: {message}")
+
+        image_bytes = _extract_image_bytes(body)
+        if not image_bytes:
+            raise TryOnError("Model returned no image. Try different photos.")
+        return image_bytes
+
+    async def generate_outfit_tryon(
+        self, person: bytes, garments: list[bytes]
+    ) -> bytes:
+        if len(garments) == 1:
+            return await self.generate_tryon(person, garments[0])
+
+        payload = build_outfit_tryon_request_payload(
+            self.model, person, garments
         )
         headers = {
             "Authorization": f"Bearer {self.api_key}",
