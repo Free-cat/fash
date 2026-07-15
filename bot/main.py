@@ -11,7 +11,7 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from bot.config import Settings, load_settings
 from bot.copy import init_copy
 from bot.db.database import Database
-from bot.handlers import admin, guide, payments, photos, privacy, referral, start, styleguide, tryon
+from bot.handlers import admin, guide, look, payments, photos, privacy, referral, start, styleguide, tryon
 from bot.middleware import AppMiddleware
 from bot.services.drip import DripService
 from bot.services.openrouter import FileStorage, OpenRouterClient
@@ -52,6 +52,7 @@ def _register_routers(dp: Dispatcher) -> None:
     dp.include_router(photos.router)
     dp.include_router(payments.router)
     dp.include_router(referral.router)
+    dp.include_router(look.router)
     dp.include_router(tryon.router)
     dp.include_router(styleguide.router)
     dp.include_router(privacy.router)

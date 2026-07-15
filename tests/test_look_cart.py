@@ -63,3 +63,21 @@ def test_look_cart_keyboard_has_generate():
     ]
     assert "look:generate" in callbacks
     assert "look:clear" in callbacks
+
+
+@pytest.mark.asyncio
+async def test_record_generation_garment_count_and_mode(tmp_path):
+    db = Database(tmp_path / "test.db")
+    await db.connect()
+    user = await db.get_or_create_user(555, None, 2)
+    gen_id = await db.record_generation(
+        user["id"],
+        "/g1.jpg,/g2.jpg",
+        "/r.jpg",
+        garment_count=2,
+        mode="cart",
+    )
+    row = await db.get_generation(gen_id, user["id"])
+    assert row["garment_count"] == 2
+    assert row["mode"] == "cart"
+    await db.close()

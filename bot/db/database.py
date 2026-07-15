@@ -299,14 +299,20 @@ class Database:
             return False
 
     async def record_generation(
-        self, user_id: int, garment_path: str, result_path: str
+        self,
+        user_id: int,
+        garment_path: str,
+        result_path: str,
+        *,
+        garment_count: int = 1,
+        mode: str = "cart",
     ) -> int:
         cursor = await self.conn.execute(
             """
-            INSERT INTO generations (user_id, garment_path, result_path)
-            VALUES (?, ?, ?)
+            INSERT INTO generations (user_id, garment_path, result_path, garment_count, mode)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (user_id, garment_path, result_path),
+            (user_id, garment_path, result_path, garment_count, mode),
         )
         await self.conn.commit()
         return int(cursor.lastrowid)

@@ -1,30 +1,21 @@
 from __future__ import annotations
 
 import asyncio
-import time
 
-from aiogram import Bot, F, Router
-from aiogram.filters import StateFilter
-from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardMarkup, Message
+from aiogram import F, Router
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from bot.copy import active_copy
 from bot.db.database import Database
-from bot.handlers.photos import Onboarding, PhotosAdding
-from bot.handlers.styleguide import schedule_style_guide_offer
 from bot.filters import TextIs
 from bot.keyboards import (
     deficit_keyboard,
-    guide_button_keyboard,
     main_keyboard,
     result_keyboard,
     shop_keyboard,
 )
 from bot.services.analytics import Analytics
 from bot.services.drip import DripService
-from bot.services.generation_guard import GenerationGuard
-from bot.services.image_processor import PhotoValidationError, validate_and_process_garment_photo
-from bot.services.openrouter import FileStorage, OpenRouterClient, TryOnError
-from bot.services.referrals import ReferralService
 
 router = Router(name="tryon")
 
@@ -130,125 +121,3 @@ async def try_on_hint(message: Message, db: Database) -> None:
         reply_markup=main_keyboard(),
     )
 
-
-@router.message(
-    F.photo,
-    ~StateFilter(Onboarding.collecting_photos),
-    ~StateFilter(PhotosAdding.adding),
-)
-async def try_on_garment(
-    message: Message,
-    bot: Bot,
-    db: Database,
-    storage: FileStorage,
-    openrouter: OpenRouterClient,
-    drip: DripService,
-) -> None:
-    copy = active_copy()
-    ok, error = await _user_ready(db, message.from_user.id)
-    if not ok:
-        await message.answer(error)
-        return
-
-    balance = await db.get_balance(message.from_user.id)
-    if balance < 1:
-        user = await db.fetch_user(message.from_user.id)
-        total_purchases = int(user["total_purchases"]) if user else 0
-        if total_purchases == 0:
-            await message.answer(copy.paywall, reply_markup=shop_keyboard())
-        else:
-            await message.answer(
-                copy.deficit,
-                parse_mode="Markdown",
-                reply_markup=deficit_keyboard(),
-            )
-        return
-
-    user = await db.fetch_user(message.from_user.id)
-    person_path = await db.get_primary_photo_path(user["id"])
-
-    photo = message.photo[-1]
-    file = await bot.get_file(photo.file_id)
-    raw = await bot.download_file(file.file_path)
-    garment_raw = raw.read()
-
-    try:
-        garment_processed = validate_and_process_garment_photo(garment_raw)
-    except PhotoValidationError as exc:
-        await message.answer(str(exc), reply_markup=guide_button_keyboard())
-        return
-
-    guard = GenerationGuard(db)
-    if guard.circuit_breaker.is_open():
-        await message.answer(copy.circuit_open, reply_markup=main_keyboard())
-        return
-
-    if not await guard.acquire(message.from_user.id):
-        await message.answer(copy.concurrent, reply_markup=main_keyboard())
-        return
-
-    analytics = Analytics(db)
-    total_purchases = int(user["total_purchases"])
-
-    try:
-        if not await db.deduct_credit(message.from_user.id):
-            await message.answer(copy.not_enough_credits)
-            return
-
-        generation_id = int(time.time())
-        garment_path = storage.save_garment_photo(
-            message.from_user.id, generation_id, garment_processed
-        )
-        person_bytes = storage.read(person_path)
-
-        status = await message.answer(copy.generating)
-
-        try:
-            result_bytes = await openrouter.generate_tryon(person_bytes, garment_processed)
-        except TryOnError as exc:
-            guard.circuit_breaker.record_failure()
-            await db.add_credits(message.from_user.id, 1)
-            await status.edit_text(copy.generation_failed.format(error=exc))
-            return
-
-        guard.circuit_breaker.record_success()
-        result_path = storage.save_result_photo(
-            message.from_user.id, generation_id, result_bytes
-        )
-        gen_id = await db.record_generation(user["id"], str(garment_path), str(result_path))
-
-        referrals = ReferralService(db)
-        await referrals.on_first_tryon(message.from_user.id)
-
-        remaining = await db.get_balance(message.from_user.id)
-        gen_count = await db.count_generations(user["id"])
-
-        await _handle_drip_triggers(
-            drip,
-            db,
-            analytics,
-            message.from_user.id,
-            user["id"],
-            remaining,
-            total_purchases,
-            gen_count,
-        )
-
-        await status.delete()
-        caption, keyboard = build_result_message(remaining, total_purchases, gen_id)
-        await _track_paywall_if_needed(
-            message, db, analytics, remaining, total_purchases
-        )
-        await message.answer_photo(
-            BufferedInputFile(result_bytes, filename="tryon.jpg"),
-            caption=caption,
-            parse_mode="Markdown",
-            reply_markup=keyboard,
-        )
-        asyncio.create_task(
-            schedule_style_guide_offer(
-                bot, db, message.from_user.id, gen_id, remaining
-            )
-        )
-    finally:
-        await guard.release(message.from_user.id)
