@@ -33,8 +33,11 @@ class Copy:
     btn_try_on: str
     btn_balance: str
     btn_buy: str
-    btn_reupload: str
+    btn_my_photos: str
     btn_help: str
+    btn_see_on_me: str
+    btn_add_item: str
+    btn_clear_look: str
     btn_photo_guide: str
     btn_upload_person: str
     btn_choose_outfit: str
@@ -85,6 +88,18 @@ class Copy:
     drip_messages: dict[str, str]
 
     referral_returning: str
+
+    look_item_added: str
+    look_one_item_hint: str
+    look_full: str
+    look_cleared: str
+    look_generating_one: str
+    look_generating_many: str
+    photo_switched: str
+    gallery_header: str
+    try_on_hint_v2: str
+    person_photo_in_tryon: str
+    welcome_back_draft_look: str
 
 
 _active: Copy | None = None

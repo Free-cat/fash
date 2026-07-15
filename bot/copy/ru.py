@@ -59,7 +59,10 @@ COPY = Copy(
     btn_try_on="Примерить одежду",
     btn_balance="Мой баланс",
     btn_buy="Купить кредиты",
-    btn_reupload="Загрузить фото заново",
+    btn_my_photos="📷 My photos",
+    btn_see_on_me="✨ See it on me",
+    btn_add_item="➕ Add another item",
+    btn_clear_look="🗑 Clear look",
     btn_help="Помощь",
     btn_photo_guide="📸 Гайд по фото",
     btn_upload_person="📷 Загрузить моё фото",
@@ -180,4 +183,23 @@ COPY = Copy(
         ),
     },
     referral_returning="С возвращением! У тебя {balance} кредит(ов).\nОтправь фото одежды или выбери действие в меню.",
+    look_item_added=(
+        "Got it — {count} item(s) in your look 👗\n"
+        "Using Photo {active_slot} ✓ · 1 try-on when you're ready"
+    ),
+    look_one_item_hint="Add more for a full look, or see it on you now.",
+    look_full="Look full — 5 items 🔥",
+    look_cleared="Look cleared — send clothing photos when you're ready 👗",
+    look_generating_one="Putting it on you… about 15 sec ✨",
+    look_generating_many="Putting your look on you… about 20 sec ✨",
+    photo_switched="Photo {slot} is now your active photo 👍",
+    gallery_header=(
+        "*My photos* ({count}/5)\nActive for try-ons: Photo {active_slot} ✓"
+    ),
+    try_on_hint_v2=(
+        "Send clothing photos — one or several 👗\n"
+        "Using Photo {active_slot} ✓ · add items, then See it on me · 1 try-on"
+    ),
+    person_photo_in_tryon="Looks like a photo of you — add it to My photos?",
+    welcome_back_draft_look="Welcome back 👋\nYou have a look waiting — {count} items.",
 )

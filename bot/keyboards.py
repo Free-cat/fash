@@ -13,7 +13,7 @@ def main_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 KeyboardButton(text=copy.btn_buy),
-                KeyboardButton(text=copy.btn_reupload),
+                KeyboardButton(text=copy.btn_my_photos),
             ],
             [KeyboardButton(text=copy.btn_help)],
         ],
@@ -124,6 +124,85 @@ def result_keyboard(balance: int, generation_id: int) -> InlineKeyboardMarkup:
             ]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def look_cart_keyboard(count: int, *, at_limit: bool) -> InlineKeyboardMarkup:
+    copy = active_copy()
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=copy.btn_see_on_me,
+                callback_data="look:generate",
+            )
+        ]
+    ]
+    if not at_limit:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=copy.btn_add_item,
+                    callback_data="look:add_hint",
+                )
+            ]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(
+                text=copy.btn_clear_look,
+                callback_data="look:clear",
+            )
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def photo_gallery_keyboard(photos: list, *, max_photos: int = 5) -> InlineKeyboardMarkup:
+    rows = []
+    for photo in photos:
+        slot = photo["slot_index"]
+        label = f"Photo {slot} ✓" if photo["is_active"] else f"Photo {slot}"
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=label,
+                    callback_data=f"photo:{photo['id']}",
+                )
+            ]
+        )
+    if len(photos) < max_photos:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text="➕ Add photo",
+                    callback_data="photo:add",
+                )
+            ]
+        )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def draft_look_keyboard() -> InlineKeyboardMarkup:
+    copy = active_copy()
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=copy.btn_see_on_me,
+                    callback_data="look:generate",
+                ),
+                InlineKeyboardButton(
+                    text=copy.btn_add_item,
+                    callback_data="look:add_hint",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=copy.btn_clear_look,
+                    callback_data="look:clear",
+                )
+            ],
+        ]
+    )
 
 
 def style_guide_offer_keyboard(generation_id: int) -> InlineKeyboardMarkup:

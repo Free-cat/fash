@@ -50,3 +50,16 @@ async def test_add_garment_stops_at_five(tmp_path):
     assert count == 5
     assert at_limit is True
     assert len(await svc.paths(user["id"])) == 5
+
+
+def test_look_cart_keyboard_has_generate():
+    from bot.copy import init_copy
+    from bot.keyboards import look_cart_keyboard
+
+    init_copy("en")
+    kb = look_cart_keyboard(2, at_limit=False)
+    callbacks = [
+        b.callback_data for row in kb.inline_keyboard for b in row if b.callback_data
+    ]
+    assert "look:generate" in callbacks
+    assert "look:clear" in callbacks
