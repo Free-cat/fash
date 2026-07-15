@@ -25,10 +25,16 @@ COPY = Copy(
     generating="Примеряем образ… ~15 секунд ✨",
     result_caption="Вот как *ты* выглядишь в этом образе.",
     paywall=(
-        "Бесплатные примерки закончились — но последний образ того стоил 🔥\n"
-        "Хочешь примерить ещё перед покупкой?"
+        "Ты уже примерил 2 образа — и один реально огонь 🔥\n"
+        "Продолжи: 5 примерок за 50⭐\n\n"
+        "Не готов платить? Покажи другу, как ты выглядишь — "
+        "+1 бесплатная, когда он примерит ✨"
     ),
-    deficit="Кредиты закончились! *5 примерок за 50⭐* — займёт 5 секунд.",
+    deficit=(
+        "Опять кончились? Похоже, тебе заходит 😏\n"
+        "В этот раз — Популярная: 15 примерок за 120⭐ "
+        "(дешевле за примерку, чем в прошлый раз)"
+    ),
     privacy_note=(
         "🔒 Фото хранятся безопасно и используются только для примерки. "
         "Удалить можно командой /delete_my_data"
@@ -53,7 +59,8 @@ COPY = Copy(
     try_another="Примерить ещё? 👗",
     low_balance="⚠️ Осталось {count} примерок",
     invite_text=(
-        "Приглашай друзей — получи +1 кредит, когда друг завершит первую примерку."
+        "Покажи другу, как ты выглядишь в этом образе — пусть попробует сам ✨\n"
+        "(а когда он сделает первую примерку — тебе +1 бесплатная)"
     ),
     share_inline_query="Смотри, как на мне! Примерь сам →",
     btn_try_on="Примерить одежду",
@@ -71,7 +78,9 @@ COPY = Copy(
     btn_invite="💫 Пригласить друзей",
     btn_share="📤 Поделиться с друзьями",
     btn_buy_credits="⭐ Купить кредиты",
-    btn_style_guide="✨ What to pair with this",
+    btn_style_guide="✨ Полный стайлинг — 3",
+    btn_use_photo="✓ Использовать для примерки",
+    btn_photo_active="✓ Активна для примерки",
     style_guide_offer=(
         "Love this look? 🔥 Get a style board for this piece — "
         "what to pair, colors & accessories. *1 try-on.*"
@@ -86,6 +95,23 @@ COPY = Copy(
     style_guide_not_found=(
         "I can't find that try-on anymore. Send a clothing photo and let's style something new 👗"
     ),
+    premium_offer_v1=(
+        "9 образов за 3 примерки — дешевле за образ, чем обычная примерка. "
+        "Твоя палитра + обувь, сумка и аксессуары к этой вещи."
+    ),
+    premium_offer_v2=(
+        'Хочешь, чтобы спросили "у тебя что, стилист?" 👀\n'
+        "9 образов с этой вещью, точная палитра, подбор аксессуаров — "
+        "весь набор профи-стайлинга."
+    ),
+    premium_offer_preview_caption="Вот что получаешь — твоя версия будет с этим образом",
+    premium_offer_cross_sell=(
+        "Для полного стайлинга нужно 3 примерки, у тебя {balance}. "
+        "Докупи или позови друга — и попробуй 👇"
+    ),
+    premium_style_guide_failed=(
+        "Не получилось собрать стайлинг — вернул(а) все 3 примерки. Попробуем ещё раз?"
+    ),
     shop_most_chosen="Популярный выбор",
     help_text=(
         "Как работает Моя примерка:\n"
@@ -93,8 +119,8 @@ COPY = Copy(
         "2. Отправь фото одежды — увидишь образ на себе.\n"
         "3. Каждый образ — 1 примерка.\n\n"
         "*My photos*\n"
-        "Save up to 5 full-body photos — tap 📷 My photos to manage them. "
-        "One photo is active for try-ons at a time.\n\n"
+        "Сохраняй фото в полный рост — 📷 My photos для управления. "
+        "Для примерок активно одно фото.\n\n"
         "*Look cart*\n"
         "Send one or several clothing photos to build a look (up to 5 items). "
         "Tap ✨ See it on me when ready — 1 try-on for the whole look.\n\n"
@@ -126,17 +152,15 @@ COPY = Copy(
     send_start_first="Сначала отправь /start.",
     upload_photos_first="Сначала загрузи фото. Отправь /start для онбординга.",
     no_saved_photos="Сохранённых фото нет. Отправь /photos для загрузки.",
-    photo_limit_reached=(
-        "Лимит фото ({limit}). Для примерки используется последнее сохранённое фото."
-    ),
+    photo_limit_reached="Можно добавлять фото дальше — для примерок активно одно.",
     photo_saved_send_garment="Фото сохранено. Отправь фото одежды для примерки.",
     photo_progress_optional=(
-        "Фото обновлено ({count}/{limit}). "
+        "Фото сохранено ({count} в My photos). "
         "Отправь фото одежды или загрузи ещё одно."
     ),
     reupload_prompt=(
-        "Отправь новые фото (до {limit} шт.). "
-        "Последнее фото станет основным для примерки."
+        "Отправь фото в полный рост, чтобы добавить в My photos. "
+        "Последнее фото станет активным для примерки."
     ),
     delete_confirmation="Все твои фото и данные удалены.",
     stop_reminders="Напоминания отключены. Больше не будем писать.",
@@ -150,16 +174,35 @@ COPY = Copy(
     ),
     payment_duplicate="Оплата уже обработана. Баланс: {balance} кредит(ов).",
     credit_packs=(
-        CreditPack(id="single", credits=1, stars=20, label="Разовая — 1 примерка"),
-        CreditPack(id="starter", credits=5, stars=50, label="Старт — 5 примерок"),
+        CreditPack(
+            id="single",
+            credits=1,
+            stars=20,
+            label="Разовая — 1 примерка",
+            qty_label="1 примерка",
+        ),
+        CreditPack(
+            id="starter",
+            credits=5,
+            stars=50,
+            label="Старт — 5 примерок",
+            qty_label="5 примерок",
+        ),
         CreditPack(
             id="popular",
             credits=15,
             stars=120,
             label="Популярная — 15 примерок",
+            qty_label="15 примерок",
             highlight=True,
         ),
-        CreditPack(id="best", credits=40, stars=250, label="Выгодная — 40 примерок"),
+        CreditPack(
+            id="best",
+            credits=40,
+            stars=250,
+            label="Выгодная — 40 примерок",
+            qty_label="40 примерок",
+        ),
     ),
     drip_messages={
         "T1": (
@@ -200,12 +243,43 @@ COPY = Copy(
     look_generating_many="Putting your look on you… about 20 sec ✨",
     photo_switched="Photo {slot} is now your active photo 👍",
     gallery_header=(
-        "*My photos* ({count}/5)\nActive for try-ons: Photo {active_slot} ✓"
+        "*My photos* ({count})\n"
+        "Просмотр: Photo {preview_slot} · Активна: Photo {active_slot} ✓\n"
+        "_Листай ◀ ▶ и нажми «Использовать для примерки»_"
     ),
+    gallery_empty=(
+        "*My photos*\n"
+        "Пока нет фото — отправь фото в полный рост 📷"
+    ),
+    gallery_hint="Листай ◀ ▶ и выбери активное фото",
     try_on_hint_v2=(
         "Send clothing photos — one or several 👗\n"
         "Using Photo {active_slot} ✓ · add items, then See it on me · 1 try-on"
     ),
     person_photo_in_tryon="Looks like a photo of you — add it to My photos?",
     welcome_back_draft_look="Welcome back 👋\nYou have a look waiting — {count} items.",
+    fallback_onboarding_person=(
+        "Отправь сюда *фото в полный рост* 📷\n\n"
+        "Советы: хороший свет, простой фон, руки видны.\n"
+        "Или сначала открой 📸 *Гайд по фото*."
+    ),
+    fallback_add_person_photo=(
+        "Отправь *фото в полный рост*, чтобы добавить в My photos 📷\n\n"
+        "Лучше всего — простой фон и хороший свет."
+    ),
+    fallback_unknown=(
+        "Не совсем понял 😊\n\n"
+        "Вот что можно сделать:\n"
+        "• Отправь *фото одежды* для примерки 👗\n"
+        "• Нажми 📷 *My photos* — управление референсами\n"
+        "• /help — полная инструкция\n\n"
+        "Баланс: {balance} примерок"
+    ),
+    fallback_unknown_with_cart=(
+        "Не совсем понял 😊\n\n"
+        "В луке уже *{count} вещей* — нажми ✨ *See it on me*, "
+        "когда будешь готов.\n"
+        "Или отправь ещё одно фото одежды 👗\n\n"
+        "Баланс: {balance} примерок"
+    ),
 )

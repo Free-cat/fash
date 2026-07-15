@@ -46,6 +46,8 @@ class Copy:
     btn_share: str
     btn_buy_credits: str
     btn_style_guide: str
+    btn_use_photo: str
+    btn_photo_active: str
 
     style_guide_offer: str
     style_guide_generating: str
@@ -53,6 +55,11 @@ class Copy:
     style_guide_already: str
     style_guide_failed: str
     style_guide_not_found: str
+    premium_offer_v1: str
+    premium_offer_v2: str
+    premium_offer_preview_caption: str
+    premium_offer_cross_sell: str
+    premium_style_guide_failed: str
     shop_most_chosen: str
 
     help_text: str
@@ -97,9 +104,19 @@ class Copy:
     look_generating_many: str
     photo_switched: str
     gallery_header: str
+    gallery_empty: str
+    gallery_hint: str
     try_on_hint_v2: str
     person_photo_in_tryon: str
     welcome_back_draft_look: str
+
+    fallback_onboarding_person: str
+    fallback_add_person_photo: str
+    fallback_unknown: str
+    fallback_unknown_with_cart: str
+
+    shop_subheader: str = ""
+    invoice_discount_note: str = ""
 
 
 _active: Copy | None = None

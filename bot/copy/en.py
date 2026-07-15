@@ -25,11 +25,16 @@ COPY = Copy(
     generating="Styling your look… this takes about 15 sec ✨",
     result_caption="This is *you* in that outfit 🔥",
     paywall=(
-        "This is *you* in that outfit 🔥\n"
-        "That's your last free try-on — and it looked great on you.\n"
-        "Keep going: 5 more try-ons for 50⭐ (~10 sec to set up)."
+        "You've tried 2 looks — and one was fire 🔥\n"
+        "Keep going: 5 try-ons for 356⭐\n\n"
+        "Not ready to pay? Show a friend how you look in this — "
+        "+1 free when they try it ✨"
     ),
-    deficit="Out of try-ons! Grab 5 more for 50⭐ — 5 seconds and you're back 👗",
+    deficit=(
+        "Out again? You must be into this 😏\n"
+        "This time — Popular: 15 try-ons for 799⭐ "
+        "(cheaper per try-on than last time)"
+    ),
     privacy_note=(
         "🔒 Photos are stored securely and used only for try-on. "
         "Delete anytime with /delete_my_data"
@@ -54,7 +59,8 @@ COPY = Copy(
     try_another="Love it? Try another 👗",
     low_balance="⚠ {count} try-on(s) left — make them count 👗",
     invite_text=(
-        "Invite friends and earn +1 credit when they complete their first try-on."
+        "Show a friend how you look in this outfit — let them try it themselves ✨\n"
+        "(and when they complete their first try-on — you get +1 free)"
     ),
     share_inline_query="Look what I'd wear! Try it yourself →",
     btn_try_on="Try on clothing",
@@ -72,7 +78,9 @@ COPY = Copy(
     btn_invite="💫 Invite friends",
     btn_share="📤 Share with friends",
     btn_buy_credits="⭐ Buy credits",
-    btn_style_guide="✨ What to pair with this",
+    btn_style_guide="✨ Full styling — 3",
+    btn_use_photo="✓ Use this for try-ons",
+    btn_photo_active="✓ Active for try-ons",
     style_guide_offer=(
         "Love this look? 🔥 Get a style board for this piece — "
         "what to pair, colors & accessories. *1 try-on.*"
@@ -87,6 +95,26 @@ COPY = Copy(
     style_guide_not_found=(
         "I can't find that try-on anymore. Send a clothing photo and let's style something new 👗"
     ),
+    premium_offer_v1=(
+        "9 looks for 3 try-ons — less per look than a regular try-on. "
+        "Your palette + shoes, bag, and accessories for this piece."
+    ),
+    premium_offer_v2=(
+        'Want people to ask "do you have a stylist?" 👀\n'
+        "9 looks with this piece, exact palette, accessory picks — "
+        "the full pro-styling package."
+    ),
+    premium_offer_preview_caption=(
+        "Here's what you get — yours will be styled with this look"
+    ),
+    premium_offer_cross_sell=(
+        "Full styling takes 3 try-ons — you have {balance}. "
+        "Grab a pack or invite a friend, then give it a go 👇"
+    ),
+    premium_style_guide_failed=(
+        "Couldn't put the styling board together — I've refunded all 3 try-ons. "
+        "Want to try again?"
+    ),
     shop_most_chosen="Most chosen",
     help_text=(
         "How FitRoom works:\n"
@@ -94,7 +122,7 @@ COPY = Copy(
         "2. Send a clothing photo to see it on you.\n"
         "3. Each look costs 1 try-on.\n\n"
         "*My photos*\n"
-        "Save up to 5 full-body photos — tap 📷 My photos to manage them. "
+        "Save full-body photos — tap 📷 My photos to manage them. "
         "One photo is active for try-ons at a time.\n\n"
         "*Look cart*\n"
         "Send one or several clothing photos to build a look (up to 5 items). "
@@ -127,40 +155,66 @@ COPY = Copy(
     send_start_first="Send /start first.",
     upload_photos_first="Upload your photos first. Send /start to begin onboarding.",
     no_saved_photos="No saved photos found. Send /photos to upload again.",
-    photo_limit_reached=(
-        "Photo limit reached ({limit}). Your latest saved photo is used for try-ons."
-    ),
+    photo_limit_reached="You can keep adding photos — one stays active for try-ons.",
     photo_saved_send_garment="Photo saved. Send a clothing photo to try it on.",
     photo_progress_optional=(
-        "Photo updated ({count}/{limit}). "
+        "Photo saved ({count} in My photos). "
         "Send a clothing photo or upload another reference."
     ),
     reupload_prompt=(
-        "Send new photos (up to {limit} stored). "
-        "Your latest photo becomes the primary try-on reference."
+        "Send a full-body photo to add to My photos. "
+        "Your latest photo becomes the active try-on reference."
     ),
     delete_confirmation="All your photos and data have been deleted.",
     stop_reminders="Reminders stopped. You won't receive follow-up messages.",
     stop_reminders_done="You won't receive follow-up messages.",
-    shop_header="Buy try-on credits with Telegram Stars:",
+    shop_header="✨ Get more try-ons",
+    shop_subheader="Bigger packs cost less per photo — pick what fits you.",
     shop_credit_line="1 credit = 1 try-on generation.",
     invoice_description="Virtual clothing try-on credits for FitRoom.",
     invoice_credits_title="{credits} Try-On Credits",
+    invoice_discount_note=("{anchor}⭐ → {stars}⭐ · save {pct}%\n"),
     payment_success=(
         "Payment successful! +{credits} credits added.\nNew balance: {balance} credit(s)."
     ),
     payment_duplicate="Payment already processed. Balance: {balance} credit(s).",
     credit_packs=(
-        CreditPack(id="single", credits=1, stars=20, label="Single — 1 try-on"),
-        CreditPack(id="starter", credits=5, stars=50, label="Starter — 5 try-ons"),
+        CreditPack(
+            id="single",
+            credits=1,
+            stars=89,
+            label="Single — 1 try-on",
+            qty_label="1 try-on",
+        ),
+        CreditPack(
+            id="starter",
+            credits=5,
+            stars=356,
+            label="Starter — 5 try-ons",
+            qty_label="5 try-ons",
+            anchor_stars=445,
+        ),
         CreditPack(
             id="popular",
             credits=15,
-            stars=120,
+            stars=799,
             label="Popular — 15 try-ons",
+            qty_label="15 try-ons",
             highlight=True,
+            anchor_stars=1335,
+            badge="most people's pick",
+            emoji="🔥",
         ),
-        CreditPack(id="best", credits=40, stars=250, label="Best Value — 40 try-ons"),
+        CreditPack(
+            id="best",
+            credits=40,
+            stars=1780,
+            label="Best Value — 40 try-ons",
+            qty_label="40 try-ons",
+            anchor_stars=3560,
+            badge="lowest price per photo",
+            emoji="💎",
+        ),
     ),
     drip_messages={
         "T1": (
@@ -169,24 +223,24 @@ COPY = Copy(
         ),
         "T2": (
             "That outfit looked great on you. Try 3 more before checkout — "
-            "Popular pack 120⭐"
+            "Popular pack 799⭐"
         ),
         "T3": "Your fitting room is waiting — see how that next outfit looks on you 👗",
         "T4": (
-            "Shoppers love trying before they buy. Starter pack — 5 try-ons for 50⭐"
+            "Shoppers love trying before they buy. Starter pack — 5 try-ons for 356⭐"
         ),
-        "T5": "Out of credits! Grab *5 more try-ons for 50⭐* — takes 5 seconds.",
+        "T5": "Out of credits! Grab *5 more try-ons for 356⭐* — takes 5 seconds.",
         "T6": (
             "Running low — only {balance} try-on(s) left. "
             "Stock up before your next outfit 👗"
         ),
         "T7": (
             "We miss you! Come back and try something new — "
-            "Single try-on for 10⭐ today"
+            "Single try-on for 49⭐ today"
         ),
         "post_purchase_upsell": (
-            "Loving your try-ons? Upgrade to *Popular — 15 try-ons* "
-            "for just +70⭐ more than Starter!"
+            "Loving your try-ons? Upgrade to *Popular — 15 try-ons* — "
+            "less than half the price per photo of Starter."
         ),
     },
     referral_returning="Welcome back! You have {balance} credit(s).\nSend a clothing photo or use the menu below.",
@@ -201,12 +255,43 @@ COPY = Copy(
     look_generating_many="Putting your look on you… about 20 sec ✨",
     photo_switched="Photo {slot} is now your active photo 👍",
     gallery_header=(
-        "*My photos* ({count}/5)\nActive for try-ons: Photo {active_slot} ✓"
+        "*My photos* ({count})\n"
+        "Preview: Photo {preview_slot} · Active: Photo {active_slot} ✓\n"
+        "_Browse with ◀ ▶, then tap Use this for try-ons_"
     ),
+    gallery_empty=(
+        "*My photos*\n"
+        "No photos yet — send a full-body photo to get started 📷"
+    ),
+    gallery_hint="Browse with ◀ ▶, then tap Use this for try-ons",
     try_on_hint_v2=(
         "Send clothing photos — one or several 👗\n"
         "Using Photo {active_slot} ✓ · add items, then See it on me · 1 try-on"
     ),
     person_photo_in_tryon="Looks like a photo of you — add it to My photos?",
     welcome_back_draft_look="Welcome back 👋\nYou have a look waiting — {count} items.",
+    fallback_onboarding_person=(
+        "Send a *full-body photo of yourself* here 📷\n\n"
+        "Tips: good light, plain background, arms visible.\n"
+        "Or tap 📸 *Photo guide* first."
+    ),
+    fallback_add_person_photo=(
+        "Send a *full-body photo* to add to My photos 📷\n\n"
+        "Plain background and good light work best."
+    ),
+    fallback_unknown=(
+        "I didn't quite catch that 😊\n\n"
+        "Here's what works:\n"
+        "• Send a *clothing photo* to try it on 👗\n"
+        "• Tap 📷 *My photos* to manage your reference photos\n"
+        "• /help — full guide\n\n"
+        "Balance: {balance} try-on(s)"
+    ),
+    fallback_unknown_with_cart=(
+        "I didn't quite catch that 😊\n\n"
+        "You have *{count} item(s)* in your look — tap ✨ *See it on me* "
+        "when ready.\n"
+        "Or send another clothing photo to add to the look 👗\n\n"
+        "Balance: {balance} try-on(s)"
+    ),
 )
