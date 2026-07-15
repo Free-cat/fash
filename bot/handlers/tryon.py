@@ -115,9 +115,11 @@ async def try_on_hint(message: Message, db: Database) -> None:
     if not ok:
         await message.answer(error)
         return
-    balance = await db.get_balance(message.from_user.id)
+    user = await db.fetch_user(message.from_user.id)
+    active = await db.get_active_photo(user["id"])
+    slot = active["slot_index"] if active else 1
     await message.answer(
-        active_copy().try_on_hint.format(balance=balance),
+        active_copy().try_on_hint_v2.format(active_slot=slot),
         reply_markup=main_keyboard(),
     )
 
