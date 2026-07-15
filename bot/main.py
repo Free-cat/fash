@@ -11,10 +11,14 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 from bot.config import Settings, load_settings
 from bot.copy import init_copy
 from bot.db.database import Database
-from bot.handlers import admin, guide, look, payments, photos, privacy, referral, start, styleguide, tryon
-from bot.middleware import AppMiddleware
+from bot.handlers import admin, fallback, guide, look, payments, photos, privacy, referral, start, styleguide, tryon
+from bot.middleware import ActivityMiddleware, AppMiddleware
 from bot.services.drip import DripService
+from bot.services.model_catalog import ModelCatalog
 from bot.services.openrouter import FileStorage, OpenRouterClient
+
+TRYON_SETTING_KEY = "tryon_model"
+STYLE_GUIDE_SETTING_KEY = "style_guide_model"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -67,6 +71,7 @@ def _register_routers(dp: Dispatcher) -> None:
     dp.include_router(styleguide.router)
     dp.include_router(privacy.router)
     dp.include_router(admin.router)
+    dp.include_router(fallback.router)
 
 
 async def _cancel_workers(worker_tasks: list[asyncio.Task[None]]) -> None:
@@ -120,14 +125,30 @@ async def main() -> None:
     copy = init_copy(settings.locale)
     db = Database(settings.database_path)
     await db.connect()
+    cleared = await db.clear_all_generation_locks()
+    if cleared:
+        logger.info("Cleared %d stale generation lock(s) on startup", cleared)
 
     storage = FileStorage(settings.storage_path)
-    openrouter = OpenRouterClient(settings.openrouter_api_key, settings.openrouter_model)
+    tryon_model = (
+        await db.get_bot_setting(TRYON_SETTING_KEY) or settings.openrouter_model
+    )
+    style_guide_model = (
+        await db.get_bot_setting(STYLE_GUIDE_SETTING_KEY)
+        or settings.openrouter_style_guide_model
+    )
+    openrouter = OpenRouterClient(
+        settings.openrouter_api_key,
+        tryon_model,
+        style_guide_model=style_guide_model,
+    )
+    model_catalog = ModelCatalog(settings.openrouter_api_key)
     drip = DripService(db)
 
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher(storage=MemoryStorage())
 
+    dp.update.middleware(ActivityMiddleware(db, drip))
     dp.update.middleware(
         AppMiddleware(
             db=db,
@@ -135,6 +156,7 @@ async def main() -> None:
             storage=storage,
             openrouter=openrouter,
             drip=drip,
+            model_catalog=model_catalog,
         )
     )
 
