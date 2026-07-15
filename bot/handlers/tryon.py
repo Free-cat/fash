@@ -11,8 +11,8 @@ from bot.filters import TextIs
 from bot.keyboards import (
     deficit_keyboard,
     main_keyboard,
+    paywall_keyboard,
     result_keyboard,
-    shop_keyboard,
 )
 from bot.services.analytics import Analytics
 from bot.services.drip import DripService
@@ -49,7 +49,7 @@ def build_result_message(
         keyboard = result_keyboard(remaining, generation_id)
     elif remaining == 0 and total_purchases == 0:
         caption = f"{caption}\n\n{copy.paywall}"
-        keyboard = shop_keyboard()
+        keyboard = paywall_keyboard()
     elif remaining == 0 and total_purchases > 0:
         caption = f"{caption}\n\n{copy.deficit}"
         keyboard = deficit_keyboard()

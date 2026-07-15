@@ -14,20 +14,21 @@ def test_result_message_merges_low_balance_into_caption():
     assert "This is *you* in that outfit 🔥" in caption
     assert "1 try-on(s) left — make them count" in caption
     assert isinstance(keyboard, InlineKeyboardMarkup)
-    assert len(keyboard.inline_keyboard) == 4
-    assert keyboard.inline_keyboard[0][0].callback_data == "styleguide:1"
+    assert len(keyboard.inline_keyboard) == 3
+    assert keyboard.inline_keyboard[0][0].switch_inline_query is not None
 
 
-def test_result_message_paywall_uses_shop_keyboard():
-    init_copy("en")
+def test_paywall_uses_paywall_keyboard_with_invite():
+    init_copy("ru")
 
     caption, keyboard = build_result_message(remaining=0, total_purchases=0)
 
-    assert "That's your last free try-on" in caption
+    assert "огонь" in caption
     callbacks = [
-        button.callback_data
+        btn.callback_data
         for row in keyboard.inline_keyboard
-        for button in row
-        if button.callback_data
+        for btn in row
+        if btn.callback_data
     ]
-    assert callbacks and callbacks[0].startswith("buy:")
+    assert any(c.startswith("buy:") for c in callbacks)
+    assert "action:invite" in callbacks

@@ -1,9 +1,15 @@
+import asyncio
 import pytest
 from unittest.mock import AsyncMock, patch
 
 from bot.copy import active_copy, init_copy
 from bot.db.database import Database
-from bot.handlers.styleguide import STYLE_GUIDE_OFFER_DELAY_SECONDS, schedule_style_guide_offer
+from bot.handlers.styleguide import (
+    STYLE_GUIDE_OFFER_DELAY_SECONDS,
+    cancel_style_guide_offer,
+    schedule_style_guide_offer,
+    schedule_style_guide_offer_task,
+)
 from bot.keyboards import result_keyboard
 from bot.services.openrouter import FileStorage
 
@@ -23,12 +29,24 @@ async def test_record_generation_returns_id_and_style_guide_update(tmp_path):
     await db.close()
 
 
-def test_result_keyboard_style_guide_is_first_row():
+def test_result_keyboard_share_is_first_row():
     init_copy("en")
     kb = result_keyboard(balance=5, generation_id=42)
     first_btn = kb.inline_keyboard[0][0]
-    assert first_btn.callback_data == "styleguide:42"
-    assert "pair" in first_btn.text.lower()
+    assert first_btn.switch_inline_query is not None
+    assert "styleguide" not in (first_btn.callback_data or "")
+
+
+def test_result_keyboard_has_no_style_guide_button():
+    init_copy("en")
+    kb = result_keyboard(balance=5, generation_id=42)
+    callbacks = [
+        btn.callback_data
+        for row in kb.inline_keyboard
+        for btn in row
+        if btn.callback_data
+    ]
+    assert not any(c and c.startswith("styleguide:") for c in callbacks)
 
 
 def test_style_guide_copy_uses_try_on_not_credit():
@@ -72,6 +90,43 @@ async def test_schedule_style_guide_offer_skips_when_no_balance(tmp_path):
     bot = AsyncMock()
     with patch("bot.handlers.styleguide.asyncio.sleep", new_callable=AsyncMock):
         await schedule_style_guide_offer(bot, db, 888, gen_id, balance=0)
+    bot.send_message.assert_not_called()
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_schedule_style_guide_offer_skips_when_generation_in_progress(tmp_path):
+    init_copy("en")
+    db = Database(tmp_path / "test.db")
+    await db.connect()
+    user = await db.get_or_create_user(telegram_id=777, username="test", free_credits=5)
+    gen_id = await db.record_generation(user["id"], "/g.jpg", "/r.jpg")
+
+    bot = AsyncMock()
+    with patch("bot.handlers.styleguide.asyncio.sleep", new_callable=AsyncMock):
+        with patch(
+            "bot.handlers.styleguide._style_guide_in_progress",
+            {(777, gen_id)},
+        ):
+            await schedule_style_guide_offer(bot, db, 777, gen_id, balance=5)
+    bot.send_message.assert_not_called()
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_cancel_style_guide_offer_prevents_follow_up(tmp_path):
+    init_copy("en")
+    db = Database(tmp_path / "test.db")
+    await db.connect()
+    user = await db.get_or_create_user(telegram_id=666, username="test", free_credits=5)
+    gen_id = await db.record_generation(user["id"], "/g.jpg", "/r.jpg")
+
+    bot = AsyncMock()
+    with patch("bot.handlers.styleguide.asyncio.sleep", new_callable=AsyncMock):
+        schedule_style_guide_offer_task(bot, db, 666, gen_id, balance=5)
+        cancel_style_guide_offer(666, gen_id)
+        await asyncio.sleep(0)
+
     bot.send_message.assert_not_called()
     await db.close()
 
