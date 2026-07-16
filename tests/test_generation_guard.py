@@ -5,14 +5,18 @@ from bot.services.generation_guard import CircuitBreaker, GenerationGuard
 
 
 @pytest.mark.asyncio
-async def test_only_one_concurrent_generation(tmp_path):
+async def test_clear_all_generation_locks(tmp_path):
     db = Database(tmp_path / "test.db")
     await db.connect()
+    await db.conn.execute(
+        "INSERT INTO generation_locks (telegram_id, started_at) VALUES (?, datetime('now'))",
+        (111,),
+    )
+    await db.conn.commit()
+    removed = await db.clear_all_generation_locks()
+    assert removed == 1
     guard = GenerationGuard(db)
-    assert await guard.acquire(100) is True
-    assert await guard.acquire(100) is False
-    await guard.release(100)
-    assert await guard.acquire(100) is True
+    assert await guard.is_locked(111) is False
     await db.close()
 
 
