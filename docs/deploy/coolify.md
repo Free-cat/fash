@@ -14,17 +14,34 @@ Telegram bot with **webhook** mode on port **8080**. One Coolify application per
 ## 1. Create application
 
 1. **+ New Resource** → **Application**
-2. Connect the `primerka_bot` repository
-3. **Build Pack:** Dockerfile
+2. Connect the `Free-cat/fash` repository
+3. **Build Pack: Dockerfile** (preferred — not Nixpacks)
 4. **Base Directory:** `/` (repo root)
-5. **Port:** `8080`
-6. **Health Check** (optional but recommended):
+5. **Dockerfile Location:** `/Dockerfile`
+6. **Port:** unused for polling; `8080` only if webhook
+7. **Custom Start Command:** leave **empty** when using Dockerfile
+8. **Health Check** (webhook only, optional):
    - Path: `/health`
-   - Port: `8080`
+   - Port: `/8080`
    - Method: GET
    - Expected: `200` with body `ok`
 
-> Health check works only when `USE_WEBHOOK=true` (production). Polling mode has no HTTP server.
+> Health check works only when `USE_WEBHOOK=true`. Polling has no HTTP server.
+
+### Nixpacks crash: `/bin/bash: -c: option requires an argument`
+
+Coolify is on **Nixpacks** with an empty start command. Fix one of:
+
+**A — Switch to Dockerfile (recommended)**
+
+1. Configuration → Build Pack → **Dockerfile**
+2. Clear Custom Start Command
+3. Redeploy
+
+**B — Stay on Nixpacks**
+
+1. Set **Custom Start Command** to exactly: `python -m bot.main`
+2. Redeploy (repo also has `Procfile` + `nixpacks.toml`)
 
 ## 2. Domain & HTTPS
 
@@ -122,6 +139,7 @@ curl http://localhost:8080/health   # ok
 
 | Symptom | Fix |
 |---------|-----|
+| `/bin/bash: -c: option requires an argument` (crash loop) | Build Pack is **Nixpacks** with empty start command, or blank Custom Start Command. **Fix:** switch Build Pack to **Dockerfile**, OR set Start Command to `python -m bot.main`, then Redeploy. |
 | Bot silent after deploy | Check `USE_WEBHOOK=true`, `WEBHOOK_URL` matches domain (no trailing path) |
 | 502 from domain | Container not listening — check port `8080`, app logs |
 | Health check failing | Enable webhook mode; path `/health` on port `8080` |
