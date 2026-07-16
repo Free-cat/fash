@@ -11,6 +11,7 @@ from bot.services.drip import DripService
 from bot.services.model_catalog import ModelCatalog
 from bot.services.openrouter import FileStorage, OpenRouterClient
 from bot.services.premium_offer import consume_ignore_if_pending
+from bot.services.proactive_guard import ProactiveGuard
 
 
 class AppMiddleware(BaseMiddleware):
@@ -22,6 +23,7 @@ class AppMiddleware(BaseMiddleware):
         openrouter: OpenRouterClient,
         drip: DripService,
         model_catalog: ModelCatalog,
+        proactive_guard: ProactiveGuard,
     ) -> None:
         self.db = db
         self.settings = settings
@@ -29,6 +31,7 @@ class AppMiddleware(BaseMiddleware):
         self.openrouter = openrouter
         self.drip = drip
         self.model_catalog = model_catalog
+        self.proactive_guard = proactive_guard
 
     async def __call__(
         self,
@@ -42,6 +45,7 @@ class AppMiddleware(BaseMiddleware):
         data["openrouter"] = self.openrouter
         data["drip"] = self.drip
         data["model_catalog"] = self.model_catalog
+        data["proactive_guard"] = self.proactive_guard
         return await handler(event, data)
 
 

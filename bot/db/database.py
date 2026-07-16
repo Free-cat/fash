@@ -588,6 +588,32 @@ class Database:
             "conversion": conversion,
         }
 
+    async def get_bot_setting(self, key: str) -> str | None:
+        cursor = await self.conn.execute(
+            "SELECT value FROM bot_settings WHERE key = ?",
+            (key,),
+        )
+        row = await cursor.fetchone()
+        return row["value"] if row else None
+
+    async def set_bot_setting(self, key: str, value: str) -> None:
+        await self.conn.execute(
+            """
+            INSERT INTO bot_settings (key, value, updated_at)
+            VALUES (?, ?, datetime('now'))
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = datetime('now')
+            """,
+            (key, value),
+        )
+        await self.conn.commit()
+
+    async def clear_all_generation_locks(self) -> int:
+        cursor = await self.conn.execute("DELETE FROM generation_locks")
+        await self.conn.commit()
+        return cursor.rowcount
+
     async def count_generations(self, user_id: int) -> int:
         cursor = await self.conn.execute(
             "SELECT COUNT(*) AS cnt FROM generations WHERE user_id = ?",

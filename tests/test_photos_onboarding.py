@@ -19,6 +19,7 @@ async def test_onboarding_completes_after_one_photo(tmp_path, monkeypatch):
         bot_token="x",
         openrouter_api_key="x",
         openrouter_model="google/gemini-3.1-flash-image",
+        openrouter_style_guide_model="openai/gpt-image-2",
         database_path=tmp_path / "test.db",
         storage_path=tmp_path / "storage",
         free_credits=2,
@@ -29,6 +30,7 @@ async def test_onboarding_completes_after_one_photo(tmp_path, monkeypatch):
         webhook_secret=None,
         guide_photo_path=tmp_path / "guide.jpg",
         demo_image_path=tmp_path / "demo.jpg",
+        premium_preview_path=tmp_path / "premium_preview.jpg",
         use_webhook=False,
     )
 

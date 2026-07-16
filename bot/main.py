@@ -16,6 +16,7 @@ from bot.middleware import ActivityMiddleware, AppMiddleware
 from bot.services.drip import DripService
 from bot.services.model_catalog import ModelCatalog
 from bot.services.openrouter import FileStorage, OpenRouterClient
+from bot.services.proactive_guard import ProactiveGuard
 
 TRYON_SETTING_KEY = "tryon_model"
 STYLE_GUIDE_SETTING_KEY = "style_guide_model"
@@ -143,7 +144,8 @@ async def main() -> None:
         style_guide_model=style_guide_model,
     )
     model_catalog = ModelCatalog(settings.openrouter_api_key)
-    drip = DripService(db)
+    proactive_guard = ProactiveGuard(db)
+    drip = DripService(db, guard=proactive_guard)
 
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher(storage=MemoryStorage())
@@ -157,6 +159,7 @@ async def main() -> None:
             openrouter=openrouter,
             drip=drip,
             model_catalog=model_catalog,
+            proactive_guard=proactive_guard,
         )
     )
 

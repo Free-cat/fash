@@ -8,10 +8,11 @@ from aiogram import Bot, F, Router
 from aiogram.filters import StateFilter
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
+from bot.config import Settings
 from bot.copy import active_copy
 from bot.db.database import Database
 from bot.handlers.photos import Onboarding, PhotosAdding
-from bot.handlers.styleguide import schedule_style_guide_offer
+from bot.handlers.styleguide import schedule_style_guide_offer_task
 from bot.handlers.tryon import (
     _handle_drip_triggers,
     _track_paywall_if_needed,
@@ -22,6 +23,7 @@ from bot.keyboards import (
     deficit_keyboard,
     guide_button_keyboard,
     look_cart_keyboard,
+    paywall_keyboard,
     shop_keyboard,
 )
 from bot.services.analytics import Analytics
@@ -30,6 +32,7 @@ from bot.services.generation_guard import GenerationGuard
 from bot.services.image_processor import PhotoValidationError
 from bot.services.look_cart import LookCartService
 from bot.services.openrouter import FileStorage, OpenRouterClient, TryOnError
+from bot.services.proactive_guard import ProactiveGuard
 from bot.services.referrals import ReferralService
 
 router = Router(name="look")
@@ -107,9 +110,11 @@ async def look_generate(
     callback: CallbackQuery,
     bot: Bot,
     db: Database,
+    settings: Settings,
     storage: FileStorage,
     openrouter: OpenRouterClient,
     drip: DripService,
+    proactive_guard: ProactiveGuard,
 ) -> None:
     copy = active_copy()
     telegram_id = callback.from_user.id
@@ -135,7 +140,7 @@ async def look_generate(
     total_purchases = int(user["total_purchases"])
     if balance < 1:
         if total_purchases == 0:
-            await callback.message.answer(copy.paywall, reply_markup=shop_keyboard())
+            await callback.message.answer(copy.paywall, reply_markup=paywall_keyboard())
         else:
             await callback.message.answer(
                 copy.deficit,
@@ -151,10 +156,6 @@ async def look_generate(
         await callback.answer()
         return
 
-    if not await guard.acquire(telegram_id):
-        await callback.answer(copy.concurrent, show_alert=True)
-        return
-
     garment_count = len(paths)
     generating = (
         copy.look_generating_one
@@ -162,82 +163,79 @@ async def look_generate(
         else copy.look_generating_many
     )
 
+    if not await db.deduct_credit(telegram_id):
+        await callback.answer(copy.not_enough_credits, show_alert=True)
+        return
+
+    generation_id = int(time.time())
+    person_bytes = storage.read(person_path)
+    garment_bytes_list = [storage.read(p) for p in paths]
+    garment_path = paths[0] if len(paths) == 1 else ",".join(paths)
+
+    status = await callback.message.answer(generating)
+    await callback.answer()
+
     try:
-        if not await db.deduct_credit(telegram_id):
-            await callback.answer(copy.not_enough_credits, show_alert=True)
-            return
-
-        generation_id = int(time.time())
-        person_bytes = storage.read(person_path)
-        garment_bytes_list = [storage.read(p) for p in paths]
-        garment_path = paths[0] if len(paths) == 1 else ",".join(paths)
-
-        status = await callback.message.answer(generating)
-        await callback.answer()
-
-        try:
-            result_bytes = await openrouter.generate_outfit_tryon(
-                person_bytes, garment_bytes_list
-            )
-        except TryOnError as exc:
-            guard.circuit_breaker.record_failure()
-            await db.add_credits(telegram_id, 1)
-            await status.edit_text(copy.generation_failed.format(error=exc))
-            await analytics.track(
-                telegram_id,
-                "look_failed",
-                json.dumps({"garment_count": garment_count}),
-            )
-            return
-
-        guard.circuit_breaker.record_success()
-        result_path = storage.save_result_photo(
-            telegram_id, generation_id, result_bytes
+        result_bytes = await openrouter.generate_outfit_tryon(
+            person_bytes, garment_bytes_list
         )
-        gen_id = await db.record_generation(
-            user["id"],
-            garment_path,
-            str(result_path),
-            garment_count=garment_count,
-            mode="cart",
-        )
-        await svc.clear(user["id"])
-
-        referrals = ReferralService(db)
-        await referrals.on_first_tryon(telegram_id)
-
-        remaining = await db.get_balance(telegram_id)
-        gen_count = await db.count_generations(user["id"])
-
-        await _handle_drip_triggers(
-            drip,
-            db,
-            analytics,
-            telegram_id,
-            user["id"],
-            remaining,
-            total_purchases,
-            gen_count,
-        )
-
-        await status.delete()
-        caption, keyboard = build_result_message(remaining, total_purchases, gen_id)
-        await _track_paywall_if_needed(
-            callback.message, db, analytics, remaining, total_purchases
-        )
-        await callback.message.answer_photo(
-            BufferedInputFile(result_bytes, filename="tryon.jpg"),
-            caption=caption,
-            parse_mode="Markdown",
-            reply_markup=keyboard,
-        )
+    except TryOnError as exc:
+        guard.circuit_breaker.record_failure()
+        await db.add_credits(telegram_id, 1)
+        await status.edit_text(copy.generation_failed.format(error=exc))
         await analytics.track(
             telegram_id,
-            "look_generated",
+            "look_failed",
             json.dumps({"garment_count": garment_count}),
         )
-        asyncio.create_task(
-            schedule_style_guide_offer(bot, db, telegram_id, gen_id, remaining)
-        )
-    finally:
-        await guard.release(telegram_id)
+        return
+
+    guard.circuit_breaker.record_success()
+    result_path = storage.save_result_photo(
+        telegram_id, generation_id, result_bytes
+    )
+    gen_id = await db.record_generation(
+        user["id"],
+        garment_path,
+        str(result_path),
+        garment_count=garment_count,
+        mode="cart",
+    )
+    await svc.clear(user["id"])
+
+    referrals = ReferralService(db)
+    await referrals.on_first_tryon(telegram_id)
+
+    remaining = await db.get_balance(telegram_id)
+    gen_count = await db.count_generations(user["id"])
+
+    await _handle_drip_triggers(
+        drip,
+        db,
+        analytics,
+        telegram_id,
+        user["id"],
+        remaining,
+        total_purchases,
+        gen_count,
+    )
+
+    await status.delete()
+    caption, keyboard = build_result_message(remaining, total_purchases, gen_id)
+    await _track_paywall_if_needed(
+        callback.message, db, analytics, remaining, total_purchases
+    )
+    await callback.message.answer_photo(
+        BufferedInputFile(result_bytes, filename="tryon.jpg"),
+        caption=caption,
+        parse_mode="Markdown",
+        reply_markup=keyboard,
+    )
+    await analytics.track(
+        telegram_id,
+        "look_generated",
+        json.dumps({"garment_count": garment_count}),
+    )
+    schedule_style_guide_offer_task(
+        bot, db, proactive_guard, settings, telegram_id, gen_id, remaining
+    )

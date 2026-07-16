@@ -4,7 +4,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from bot.services.openrouter import DEFAULT_TRYON_MODEL
+from bot.services.openrouter import DEFAULT_STYLE_GUIDE_MODEL, DEFAULT_TRYON_MODEL
 
 load_dotenv()
 
@@ -17,7 +17,18 @@ class CreditPack:
     credits: int
     stars: int
     label: str
+    qty_label: str
     highlight: bool = False
+    anchor_stars: int | None = None
+    badge: str | None = None
+    emoji: str = ""
+
+
+def save_percent(pack: CreditPack) -> int | None:
+    """Round % discount vs. buying `pack.credits` singles, or None if no anchor is set."""
+    if not pack.anchor_stars:
+        return None
+    return round((1 - pack.stars / pack.anchor_stars) * 100)
 
 
 @dataclass(frozen=True)
@@ -25,6 +36,7 @@ class Settings:
     bot_token: str
     openrouter_api_key: str
     openrouter_model: str
+    openrouter_style_guide_model: str
     database_path: Path
     storage_path: Path
     free_credits: int
@@ -35,6 +47,7 @@ class Settings:
     webhook_secret: str | None
     guide_photo_path: Path
     demo_image_path: Path
+    premium_preview_path: Path
     use_webhook: bool
 
 
@@ -55,6 +68,9 @@ def load_settings() -> Settings:
         openrouter_model=os.getenv(
             "OPENROUTER_MODEL", DEFAULT_TRYON_MODEL
         ).strip(),
+        openrouter_style_guide_model=os.getenv(
+            "OPENROUTER_STYLE_GUIDE_MODEL", DEFAULT_STYLE_GUIDE_MODEL
+        ).strip(),
         database_path=BASE_DIR / os.getenv("DATABASE_PATH", "data/bot.db"),
         storage_path=BASE_DIR / os.getenv("STORAGE_PATH", "data/storage"),
         free_credits=int(os.getenv("FREE_CREDITS", "2")),
@@ -67,5 +83,7 @@ def load_settings() -> Settings:
         / os.getenv("GUIDE_PHOTO_PATH", "assets/guide/photo_guide.jpg"),
         demo_image_path=BASE_DIR
         / os.getenv("DEMO_IMAGE_PATH", "assets/demo/how_it_works.jpg"),
+        premium_preview_path=BASE_DIR
+        / os.getenv("PREMIUM_PREVIEW_PATH", "assets/guide/premium_preview.jpg"),
         use_webhook=os.getenv("USE_WEBHOOK", "false").lower() in ("1", "true", "yes"),
     )
