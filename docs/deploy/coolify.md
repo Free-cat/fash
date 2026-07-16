@@ -22,7 +22,7 @@ Telegram bot with **webhook** mode on port **8080**. One Coolify application per
 7. **Custom Start Command:** leave **empty** when using Dockerfile
 8. **Health Check** (webhook only, optional):
    - Path: `/health`
-   - Port: `/8080`
+   - Port: `8080`
    - Method: GET
    - Expected: `200` with body `ok`
 
