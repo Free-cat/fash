@@ -119,6 +119,12 @@ class Copy:
     fallback_unknown: str
     fallback_unknown_with_cart: str
 
+    admin_grant_prompt_user: str
+    admin_grant_invalid_id: str
+    admin_grant_pick_amount: str
+    admin_grant_success: str
+    admin_grant_amount_invalid: str
+
     shop_subheader: str = ""
     invoice_discount_note: str = ""
 

@@ -312,4 +312,19 @@ COPY = Copy(
         "Or send another clothing photo to add to the look 👗\n\n"
         "Balance: {balance} try-on(s)"
     ),
+    admin_grant_prompt_user=(
+        "🎁 *Grant try-ons*\n\n"
+        "Send the user's *Telegram ID* (numbers only).\n"
+        "Or /cancel to abort."
+    ),
+    admin_grant_invalid_id="That doesn't look like a Telegram ID. Send numbers only.",
+    admin_grant_pick_amount=(
+        "User `{telegram_id}` — current balance: *{balance}*.\n"
+        "How many try-ons to add?"
+    ),
+    admin_grant_success=(
+        "Done ✅ Added *{amount}* try-on(s) to `{telegram_id}`.\n"
+        "New balance: *{balance}*"
+    ),
+    admin_grant_amount_invalid="Amount must be between 1 and 100.",
 )

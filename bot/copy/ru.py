@@ -299,4 +299,19 @@ COPY = Copy(
         "Или отправь ещё одно фото одежды 👗\n\n"
         "Баланс: {balance} примерок"
     ),
+    admin_grant_prompt_user=(
+        "🎁 *Выдать примерки*\n\n"
+        "Отправь *Telegram ID* пользователя (только цифры).\n"
+        "Или /cancel для отмены."
+    ),
+    admin_grant_invalid_id="Это не похоже на Telegram ID. Отправь только цифры.",
+    admin_grant_pick_amount=(
+        "Пользователь `{telegram_id}` — баланс: *{balance}*.\n"
+        "Сколько примерок добавить?"
+    ),
+    admin_grant_success=(
+        "Готово ✅ Добавил *{amount}* примерок пользователю `{telegram_id}`.\n"
+        "Новый баланс: *{balance}*"
+    ),
+    admin_grant_amount_invalid="Количество должно быть от 1 до 100.",
 )

@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from bot.config import Settings
+from bot.copy import active_copy
 from bot.db.database import Database
+from bot.services.analytics import Analytics
 from bot.services.model_catalog import PAGE_SIZE, ModelCatalog, model_short_label
 from bot.services.openrouter import OpenRouterClient
 
@@ -13,6 +17,12 @@ router = Router(name="admin")
 
 TRYON_SETTING_KEY = "tryon_model"
 STYLE_GUIDE_SETTING_KEY = "style_guide_model"
+GRANT_AMOUNTS = (1, 3, 5, 10, 20)
+MAX_GRANT_AMOUNT = 100
+
+
+class AdminGrant(StatesGroup):
+    waiting_user_id = State()
 
 
 def _is_owner(user_id: int, settings: Settings) -> bool:
@@ -43,16 +53,43 @@ def _admin_menu_keyboard() -> InlineKeyboardMarkup:
             ],
             [
                 InlineKeyboardButton(
-                    text="🔄 Refresh model list",
-                    callback_data="admin:refresh",
+                    text="🎁 Grant try-ons",
+                    callback_data="admin:grant",
                 ),
                 InlineKeyboardButton(
                     text="📊 Stats",
                     callback_data="admin:stats",
                 ),
             ],
+            [
+                InlineKeyboardButton(
+                    text="🔄 Refresh model list",
+                    callback_data="admin:refresh",
+                ),
+            ],
         ]
     )
+
+
+def _grant_amount_keyboard(telegram_id: int) -> InlineKeyboardMarkup:
+    rows = [
+        [
+            InlineKeyboardButton(
+                text=f"+{amount}",
+                callback_data=f"admin:grant:{telegram_id}:{amount}",
+            )
+            for amount in GRANT_AMOUNTS[:3]
+        ],
+        [
+            InlineKeyboardButton(
+                text=f"+{amount}",
+                callback_data=f"admin:grant:{telegram_id}:{amount}",
+            )
+            for amount in GRANT_AMOUNTS[3:]
+        ],
+        [InlineKeyboardButton(text="« Back", callback_data="admin:menu")],
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def _model_picker_keyboard(
@@ -100,6 +137,20 @@ def _model_picker_keyboard(
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
+async def _grant_credits(
+    db: Database,
+    *,
+    target_id: int,
+    amount: int,
+) -> int:
+    if amount < 1 or amount > MAX_GRANT_AMOUNT:
+        raise ValueError("invalid amount")
+    await db.get_or_create_user(target_id, username=None, free_credits=0)
+    await db.add_credits(target_id, amount)
+    await Analytics(db).track(target_id, "admin_grant", str(amount))
+    return await db.get_balance(target_id)
+
+
 async def _show_admin_menu(
     *,
     message: Message | CallbackQuery,
@@ -125,12 +176,67 @@ async def _show_admin_menu(
 @router.message(Command("admin"))
 async def cmd_admin(
     message: Message,
+    state: FSMContext,
     settings: Settings,
     openrouter: OpenRouterClient,
 ) -> None:
     if not _is_owner(message.from_user.id, settings):
         return
+    await state.clear()
     await _show_admin_menu(message=message, openrouter=openrouter, edit=False)
+
+
+@router.message(Command("cancel"))
+async def cmd_cancel_admin(message: Message, state: FSMContext, settings: Settings) -> None:
+    if not _is_owner(message.from_user.id, settings):
+        return
+    current = await state.get_state()
+    if current != AdminGrant.waiting_user_id.state:
+        return
+    await state.clear()
+    await message.answer("Cancelled.")
+
+
+@router.message(Command("grant"))
+async def cmd_grant(
+    message: Message,
+    db: Database,
+    settings: Settings,
+) -> None:
+    if not _is_owner(message.from_user.id, settings):
+        return
+
+    copy = active_copy()
+    parts = (message.text or "").split()
+    if len(parts) != 3:
+        await message.answer(
+            "Usage: `/grant <telegram_id> <amount>`\n"
+            "Example: `/grant 123456789 5`",
+            parse_mode="Markdown",
+        )
+        return
+
+    try:
+        target_id = int(parts[1])
+        amount = int(parts[2])
+    except ValueError:
+        await message.answer(copy.admin_grant_invalid_id)
+        return
+
+    try:
+        balance = await _grant_credits(db, target_id=target_id, amount=amount)
+    except ValueError:
+        await message.answer(copy.admin_grant_amount_invalid)
+        return
+
+    await message.answer(
+        copy.admin_grant_success.format(
+            telegram_id=target_id,
+            amount=amount,
+            balance=balance,
+        ),
+        parse_mode="Markdown",
+    )
 
 
 @router.message(Command("stats"))
@@ -148,9 +254,38 @@ async def cmd_stats(message: Message, db: Database, settings: Settings) -> None:
     )
 
 
+@router.message(AdminGrant.waiting_user_id)
+async def admin_grant_user_id(
+    message: Message,
+    state: FSMContext,
+    db: Database,
+    settings: Settings,
+) -> None:
+    if not _is_owner(message.from_user.id, settings):
+        await state.clear()
+        return
+
+    copy = active_copy()
+    text = (message.text or "").strip()
+    if not text.isdigit():
+        await message.answer(copy.admin_grant_invalid_id)
+        return
+
+    target_id = int(text)
+    await db.get_or_create_user(target_id, username=None, free_credits=0)
+    balance = await db.get_balance(target_id)
+    await state.clear()
+    await message.answer(
+        copy.admin_grant_pick_amount.format(telegram_id=target_id, balance=balance),
+        parse_mode="Markdown",
+        reply_markup=_grant_amount_keyboard(target_id),
+    )
+
+
 @router.callback_query(F.data.startswith("admin:"))
 async def admin_callback(
     callback: CallbackQuery,
+    state: FSMContext,
     db: Database,
     settings: Settings,
     openrouter: OpenRouterClient,
@@ -168,8 +303,43 @@ async def admin_callback(
         return
 
     if action == "menu":
+        await state.clear()
         await _show_admin_menu(message=callback, openrouter=openrouter, edit=True)
         return
+
+    if action == "grant":
+        if len(parts) == 2:
+            copy = active_copy()
+            await state.set_state(AdminGrant.waiting_user_id)
+            await callback.message.answer(
+                copy.admin_grant_prompt_user,
+                parse_mode="Markdown",
+            )
+            await callback.answer()
+            return
+
+        if len(parts) == 4:
+            copy = active_copy()
+            try:
+                target_id = int(parts[2])
+                amount = int(parts[3])
+                balance = await _grant_credits(
+                    db, target_id=target_id, amount=amount
+                )
+            except ValueError:
+                await callback.answer(copy.admin_grant_amount_invalid, show_alert=True)
+                return
+
+            await callback.message.answer(
+                copy.admin_grant_success.format(
+                    telegram_id=target_id,
+                    amount=amount,
+                    balance=balance,
+                ),
+                parse_mode="Markdown",
+            )
+            await callback.answer(f"+{amount} granted")
+            return
 
     if action == "refresh":
         try:
