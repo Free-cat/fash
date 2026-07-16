@@ -74,47 +74,45 @@ def shop_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def deficit_keyboard() -> InlineKeyboardMarkup:
+def _style_guide_button(generation_id: int, cost: int) -> InlineKeyboardButton:
     copy = active_copy()
-    starter = next(p for p in copy.credit_packs if p.id == "starter")
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=pack_button_text(starter),
-                    callback_data="buy:starter",
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    text=copy.btn_buy_credits,
-                    callback_data="shop:open",
-                )
-            ],
-        ],
+    text = copy.btn_style_guide_showcase if cost == 1 else copy.btn_style_guide
+    return InlineKeyboardButton(
+        text=text,
+        callback_data=f"styleguide:{generation_id}",
     )
 
 
-def result_keyboard(balance: int, generation_id: int) -> InlineKeyboardMarkup:
+def result_keyboard(
+    balance: int,
+    generation_id: int,
+    *,
+    cost: int | None = None,
+) -> InlineKeyboardMarkup:
     copy = active_copy()
-    rows = [
+    rows: list[list[InlineKeyboardButton]] = []
+    if cost is not None and generation_id > 0:
+        rows.append([_style_guide_button(generation_id, cost)])
+    rows.extend(
         [
-            InlineKeyboardButton(
-                text=copy.btn_share,
-                switch_inline_query=copy.share_inline_query,
-            ),
-        ],
-        [
-            InlineKeyboardButton(
-                text=copy.btn_try_another,
-                callback_data="action:try_another",
-            ),
-            InlineKeyboardButton(
-                text=copy.btn_invite,
-                callback_data="action:invite",
-            ),
-        ],
-    ]
+            [
+                InlineKeyboardButton(
+                    text=copy.btn_share,
+                    switch_inline_query=copy.share_inline_query,
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text=copy.btn_try_another,
+                    callback_data="action:try_another",
+                ),
+                InlineKeyboardButton(
+                    text=copy.btn_invite,
+                    callback_data="action:invite",
+                ),
+            ],
+        ]
+    )
     if balance <= 2:
         rows.append(
             [
@@ -127,23 +125,61 @@ def result_keyboard(balance: int, generation_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def paywall_keyboard() -> InlineKeyboardMarkup:
+def paywall_keyboard(
+    *,
+    generation_id: int = 0,
+    cost: int | None = None,
+) -> InlineKeyboardMarkup:
     copy = active_copy()
-    rows = [
+    rows: list[list[InlineKeyboardButton]] = []
+    if cost is not None and generation_id > 0:
+        rows.append([_style_guide_button(generation_id, cost)])
+    rows.extend(
         [
-            InlineKeyboardButton(
-                text=pack_button_text(pack),
-                callback_data=f"buy:{pack.id}",
-            )
+            [
+                InlineKeyboardButton(
+                    text=pack_button_text(pack),
+                    callback_data=f"buy:{pack.id}",
+                )
+            ]
+            for pack in copy.credit_packs
         ]
-        for pack in copy.credit_packs
-    ]
+    )
     rows.append(
         [
             InlineKeyboardButton(
                 text=copy.btn_invite,
                 callback_data="action:invite",
             ),
+        ]
+    )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def deficit_keyboard(
+    *,
+    generation_id: int = 0,
+    cost: int | None = None,
+) -> InlineKeyboardMarkup:
+    copy = active_copy()
+    starter = next(p for p in copy.credit_packs if p.id == "starter")
+    rows: list[list[InlineKeyboardButton]] = []
+    if cost is not None and generation_id > 0:
+        rows.append([_style_guide_button(generation_id, cost)])
+    rows.extend(
+        [
+            [
+                InlineKeyboardButton(
+                    text=pack_button_text(starter),
+                    callback_data="buy:starter",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=copy.btn_buy_credits,
+                    callback_data="shop:open",
+                )
+            ],
         ]
     )
     return InlineKeyboardMarkup(inline_keyboard=rows)

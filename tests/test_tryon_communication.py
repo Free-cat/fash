@@ -8,20 +8,22 @@ def test_result_message_merges_low_balance_into_caption():
     init_copy("en")
 
     caption, keyboard = build_result_message(
-        remaining=1, total_purchases=0, generation_id=1
+        remaining=1, total_purchases=0, generation_id=1, cost=1
     )
 
     assert "This is *you* in that outfit 🔥" in caption
     assert "1 try-on(s) left — make them count" in caption
     assert isinstance(keyboard, InlineKeyboardMarkup)
-    assert len(keyboard.inline_keyboard) == 3
-    assert keyboard.inline_keyboard[0][0].switch_inline_query is not None
+    assert keyboard.inline_keyboard[0][0].callback_data == "styleguide:1"
+    assert keyboard.inline_keyboard[1][0].switch_inline_query is not None
 
 
 def test_paywall_uses_paywall_keyboard_with_invite():
     init_copy("ru")
 
-    caption, keyboard = build_result_message(remaining=0, total_purchases=0)
+    caption, keyboard = build_result_message(
+        remaining=0, total_purchases=0, generation_id=7, cost=3
+    )
 
     assert "огонь" in caption
     callbacks = [
@@ -30,5 +32,6 @@ def test_paywall_uses_paywall_keyboard_with_invite():
         for btn in row
         if btn.callback_data
     ]
+    assert callbacks[0] == "styleguide:7"
     assert any(c.startswith("buy:") for c in callbacks)
     assert "action:invite" in callbacks

@@ -56,17 +56,19 @@ async def test_record_generation_returns_id_and_style_guide_update(tmp_path):
     await db.close()
 
 
-def test_result_keyboard_share_is_first_row():
+def test_result_keyboard_style_guide_is_first_row():
     init_copy("en")
-    kb = result_keyboard(balance=5, generation_id=42)
+    kb = result_keyboard(balance=5, generation_id=42, cost=1)
     first_btn = kb.inline_keyboard[0][0]
-    assert first_btn.switch_inline_query is not None
-    assert "styleguide" not in (first_btn.callback_data or "")
+    assert first_btn.callback_data == "styleguide:42"
+    assert first_btn.text.endswith("1")
+    share_btn = kb.inline_keyboard[1][0]
+    assert share_btn.switch_inline_query is not None
 
 
-def test_result_keyboard_has_no_style_guide_button():
+def test_result_keyboard_omits_style_guide_without_cost():
     init_copy("en")
-    kb = result_keyboard(balance=5, generation_id=42)
+    kb = result_keyboard(balance=5, generation_id=42, cost=None)
     callbacks = [
         btn.callback_data
         for row in kb.inline_keyboard

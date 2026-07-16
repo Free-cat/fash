@@ -37,24 +37,27 @@ def build_result_message(
     remaining: int,
     total_purchases: int,
     generation_id: int = 0,
+    *,
+    cost: int | None = None,
 ) -> tuple[str, InlineKeyboardMarkup]:
     copy = active_copy()
     caption = copy.result_caption
+    style_cost = cost if generation_id > 0 else None
 
     if remaining > 3:
         caption = f"{caption}\n\n{copy.try_another}"
-        keyboard = result_keyboard(remaining, generation_id)
+        keyboard = result_keyboard(remaining, generation_id, cost=style_cost)
     elif 1 <= remaining <= 3:
         caption = f"{caption}\n\n{copy.low_balance.format(count=remaining)}"
-        keyboard = result_keyboard(remaining, generation_id)
+        keyboard = result_keyboard(remaining, generation_id, cost=style_cost)
     elif remaining == 0 and total_purchases == 0:
         caption = f"{caption}\n\n{copy.paywall}"
-        keyboard = paywall_keyboard()
+        keyboard = paywall_keyboard(generation_id=generation_id, cost=style_cost)
     elif remaining == 0 and total_purchases > 0:
         caption = f"{caption}\n\n{copy.deficit}"
-        keyboard = deficit_keyboard()
+        keyboard = deficit_keyboard(generation_id=generation_id, cost=style_cost)
     else:
-        keyboard = result_keyboard(remaining, generation_id)
+        keyboard = result_keyboard(remaining, generation_id, cost=style_cost)
 
     return caption, keyboard
 

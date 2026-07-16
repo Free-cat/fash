@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 
+from datetime import datetime, timezone
+
 from aiogram import Bot, F, Router
 from aiogram.types import BufferedInputFile, CallbackQuery, FSInputFile
 
@@ -51,9 +53,17 @@ def schedule_style_guide_offer_task(
 ) -> None:
     key = (telegram_id, generation_id)
     cancel_style_guide_offer(telegram_id, generation_id)
+    idle_since = datetime.now(timezone.utc)
     task = asyncio.create_task(
         schedule_style_guide_offer(
-            bot, db, guard, settings, telegram_id, generation_id, balance
+            bot,
+            db,
+            guard,
+            settings,
+            telegram_id,
+            generation_id,
+            balance,
+            idle_since=idle_since,
         )
     )
     _pending_offers[key] = task
@@ -163,12 +173,12 @@ async def style_guide_callback(
         if total_purchases == 0:
             await callback.message.answer(
                 cross_sell,
-                reply_markup=paywall_keyboard(),
+                reply_markup=paywall_keyboard(generation_id=generation_id, cost=cost),
             )
         else:
             await callback.message.answer(
                 cross_sell,
-                reply_markup=deficit_keyboard(),
+                reply_markup=deficit_keyboard(generation_id=generation_id, cost=cost),
             )
         await callback.answer()
         return
@@ -212,7 +222,7 @@ async def style_guide_callback(
             await callback.message.answer_photo(
                 BufferedInputFile(guide_bytes, filename="style_guide.jpg"),
                 caption=copy.style_guide_caption,
-                reply_markup=result_keyboard(remaining, generation_id),
+                reply_markup=result_keyboard(remaining, generation_id, cost=None),
             )
         except TryOnError as exc:
             guard.circuit_breaker.record_failure()
@@ -244,6 +254,8 @@ async def schedule_style_guide_offer(
     telegram_id: int,
     generation_id: int,
     balance: int,
+    *,
+    idle_since: datetime | None = None,
 ) -> None:
     try:
         await asyncio.sleep(PREMIUM_OFFER_DELAY_SECONDS)
@@ -256,7 +268,10 @@ async def schedule_style_guide_offer(
             return
 
         if not await guard.can_send(
-            telegram_id, TOUCHPOINT_PREMIUM, generation_id=generation_id
+            telegram_id,
+            TOUCHPOINT_PREMIUM,
+            generation_id=generation_id,
+            idle_since=idle_since,
         ):
             await Analytics(db).track(
                 telegram_id, "proactive_suppressed", TOUCHPOINT_PREMIUM
@@ -273,7 +288,7 @@ async def schedule_style_guide_offer(
             await bot.send_message(
                 telegram_id,
                 _premium_cross_sell(copy, balance, cost),
-                reply_markup=paywall_keyboard(),
+                reply_markup=paywall_keyboard(generation_id=generation_id, cost=cost),
             )
             return
 

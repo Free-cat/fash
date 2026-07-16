@@ -8,9 +8,7 @@ from bot.services.generation_guard import GenerationGuard
 TOUCHPOINT_PREMIUM = "premium_offer"
 TOUCHPOINT_DRIP = "drip"
 
-_PREMIUM_ACTIVITY_MINUTES = 2
 _DRIP_ACTIVITY_MINUTES = 10
-_PREMIUM_COOLDOWN_HOURS = 4
 
 
 class ProactiveGuard:
@@ -24,6 +22,7 @@ class ProactiveGuard:
         touchpoint: str,
         *,
         generation_id: int | None = None,
+        idle_since: datetime | None = None,
     ) -> bool:
         if await self._generation_guard.is_locked(telegram_id):
             return False
@@ -32,26 +31,30 @@ class ProactiveGuard:
         if not user:
             return False
 
-        activity_minutes = (
-            _PREMIUM_ACTIVITY_MINUTES
-            if touchpoint == TOUCHPOINT_PREMIUM
-            else _DRIP_ACTIVITY_MINUTES
-        )
-        if self._recently_active(user["last_active_at"], activity_minutes):
-            return False
-
         if touchpoint == TOUCHPOINT_PREMIUM:
-            return await self._premium_allowed(user, generation_id)
+            return await self._premium_allowed(
+                user, generation_id=generation_id, idle_since=idle_since
+            )
+
+        if self._recently_active(user["last_active_at"], _DRIP_ACTIVITY_MINUTES):
+            return False
         return True
 
-    async def _premium_allowed(self, user, generation_id: int | None) -> bool:
+    async def _premium_allowed(
+        self,
+        user,
+        *,
+        generation_id: int | None,
+        idle_since: datetime | None,
+    ) -> bool:
         if user["premium_offer_paused_until"]:
             if self._is_future(user["premium_offer_paused_until"]):
                 return False
             await self.db.reset_premium_offer_ignored(user["telegram_id"])
 
-        if user["premium_offer_last_shown_at"]:
-            if self._within_hours(user["premium_offer_last_shown_at"], _PREMIUM_COOLDOWN_HOURS):
+        if idle_since is not None and user["last_active_at"]:
+            last_active = self._parse_dt(user["last_active_at"])
+            if last_active > idle_since:
                 return False
 
         if generation_id is not None:
@@ -69,10 +72,9 @@ class ProactiveGuard:
     def _recently_active(self, last_active_at: str | None, minutes: int) -> bool:
         if not last_active_at:
             return False
-        return datetime.now(timezone.utc) - self._parse_dt(last_active_at) < timedelta(minutes=minutes)
-
-    def _within_hours(self, value: str, hours: int) -> bool:
-        return datetime.now(timezone.utc) - self._parse_dt(value) < timedelta(hours=hours)
+        return datetime.now(timezone.utc) - self._parse_dt(last_active_at) < timedelta(
+            minutes=minutes
+        )
 
     def _is_future(self, value: str) -> bool:
         return self._parse_dt(value) > datetime.now(timezone.utc)

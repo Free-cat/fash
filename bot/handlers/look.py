@@ -221,7 +221,9 @@ async def look_generate(
     )
 
     await status.delete()
-    caption, keyboard = build_result_message(remaining, total_purchases, gen_id)
+    caption, keyboard = build_result_message(
+        remaining, total_purchases, gen_id, cost=await db.get_style_guide_cost(telegram_id)
+    )
     await _track_paywall_if_needed(
         callback.message, db, analytics, remaining, total_purchases
     )
