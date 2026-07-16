@@ -15,7 +15,15 @@ def test_result_message_merges_low_balance_into_caption():
     assert "1 try-on(s) left — make them count" in caption
     assert isinstance(keyboard, InlineKeyboardMarkup)
     assert keyboard.inline_keyboard[0][0].callback_data == "styleguide:1"
-    assert keyboard.inline_keyboard[1][0].switch_inline_query is not None
+    callbacks = [
+        btn.callback_data
+        for row in keyboard.inline_keyboard
+        for btn in row
+        if btn.callback_data
+    ]
+    assert "look:add_item:1" in callbacks
+    assert "look:clear" in callbacks
+    assert "action:try_another" in callbacks
 
 
 def test_paywall_uses_paywall_keyboard_with_invite():

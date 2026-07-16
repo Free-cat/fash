@@ -9,6 +9,9 @@ from bot.services.openrouter import DEFAULT_STYLE_GUIDE_MODEL, DEFAULT_TRYON_MOD
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+DEFAULT_GENERATING_STICKER_ID = (
+    "CAACAgQAAxkBAAERjX1qWVwwGE_33I-okc4In27JE9j5HgACKhEAAv9X8FH2t7Ww8CdM8D0E"
+)
 
 
 @dataclass(frozen=True)
@@ -48,6 +51,7 @@ class Settings:
     guide_photo_path: Path
     demo_image_path: Path
     premium_preview_path: Path
+    generating_sticker_id: str | None
     use_webhook: bool
 
 
@@ -85,5 +89,9 @@ def load_settings() -> Settings:
         / os.getenv("DEMO_IMAGE_PATH", "assets/demo/how_it_works.jpg"),
         premium_preview_path=BASE_DIR
         / os.getenv("PREMIUM_PREVIEW_PATH", "assets/guide/premium_preview.jpg"),
+        generating_sticker_id=(
+            os.getenv("GENERATING_STICKER_ID", DEFAULT_GENERATING_STICKER_ID).strip()
+            or None
+        ),
         use_webhook=os.getenv("USE_WEBHOOK", "false").lower() in ("1", "true", "yes"),
     )

@@ -236,6 +236,52 @@ class Database:
         )
         await self.conn.commit()
 
+    async def set_active_look(self, user_id: int, generation_id: int | None) -> None:
+        await self.conn.execute(
+            "UPDATE users SET active_look_generation_id = ? WHERE id = ?",
+            (generation_id, user_id),
+        )
+        await self.conn.commit()
+
+    async def set_waiting_look_add_item(self, user_id: int, waiting: bool) -> None:
+        await self.conn.execute(
+            "UPDATE users SET waiting_look_add_item = ? WHERE id = ?",
+            (1 if waiting else 0, user_id),
+        )
+        await self.conn.commit()
+
+    async def get_active_look_state(self, user_id: int) -> dict:
+        cursor = await self.conn.execute(
+            """
+            SELECT active_look_generation_id, waiting_look_add_item
+            FROM users WHERE id = ?
+            """,
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return {
+                "active_look_generation_id": None,
+                "waiting_look_add_item": 0,
+            }
+        return {
+            "active_look_generation_id": row["active_look_generation_id"],
+            "waiting_look_add_item": int(row["waiting_look_add_item"] or 0),
+        }
+
+    async def clear_look_completely(self, user_id: int) -> None:
+        await self.clear_look_cart(user_id)
+        await self.conn.execute(
+            """
+            UPDATE users
+            SET active_look_generation_id = NULL,
+                waiting_look_add_item = 0
+            WHERE id = ?
+            """,
+            (user_id,),
+        )
+        await self.conn.commit()
+
     async def purge_stale_look_carts(self, max_age_hours: int = 24) -> int:
         cursor = await self.conn.execute(
             """

@@ -66,6 +66,7 @@ COPY = Copy(
     btn_my_photos="📷 My photos",
     btn_see_on_me="✨ See it on me",
     btn_add_item="➕ Add another item",
+    btn_add_to_look="➕ Add item",
     btn_clear_look="🗑 Clear look",
     btn_help="Help",
     btn_photo_guide="📸 Photo guide",
@@ -268,7 +269,18 @@ COPY = Copy(
     ),
     look_one_item_hint="Add more for a full look, or see it on you now.",
     look_full="Look full — 5 items 🔥",
-    look_cleared="Look cleared — send clothing photos when you're ready 👗",
+    look_cleared=(
+        "Look cleared — cart, add-item wait, and this result chain are gone. "
+        "Send clothing photos when you're ready 👗"
+    ),
+    look_add_item_prompt=(
+        "Send a clothing photo to add to *this* look — "
+        "I'll layer it onto your last result (1 try-on)."
+    ),
+    look_add_item_generating="Adding it to your look… about 15 sec ✨",
+    look_add_item_no_active=(
+        "No active look to add to — send a clothing photo and generate a look first 👗"
+    ),
     look_generating_one="Putting it on you… about 15 sec ✨",
     look_generating_many="Putting your look on you… about 20 sec ✨",
     photo_switched="Photo {slot} is now your active photo 👍",

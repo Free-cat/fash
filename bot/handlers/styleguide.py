@@ -19,6 +19,7 @@ from bot.keyboards import (
 )
 from bot.services.analytics import Analytics
 from bot.services.generation_guard import GenerationGuard
+from bot.services.generation_status import send_generation_status
 from bot.services.openrouter import FileStorage, OpenRouterClient, TryOnError
 from bot.services.premium_offer import (
     PREMIUM_OFFER_DELAY_SECONDS,
@@ -125,6 +126,7 @@ def _premium_cross_sell(copy, balance: int, cost: int) -> str:
 @router.callback_query(F.data.startswith("styleguide:"))
 async def style_guide_callback(
     callback: CallbackQuery,
+    settings: Settings,
     db: Database,
     storage: FileStorage,
     openrouter: OpenRouterClient,
@@ -197,7 +199,11 @@ async def style_guide_callback(
     in_progress_key = (telegram_id, generation_id)
     _style_guide_in_progress.add(in_progress_key)
     try:
-        status = await callback.message.answer(copy.style_guide_generating)
+        generation_status = await send_generation_status(
+            callback.message,
+            sticker_id=settings.generating_sticker_id,
+            text=copy.style_guide_generating,
+        )
         await callback.answer()
 
         try:
@@ -218,7 +224,7 @@ async def style_guide_callback(
             remaining = await db.get_balance(telegram_id)
             await analytics.track(telegram_id, "style_guide_generated")
 
-            await status.delete()
+            await generation_status.complete()
             await callback.message.answer_photo(
                 BufferedInputFile(guide_bytes, filename="style_guide.jpg"),
                 caption=copy.style_guide_caption,
@@ -234,14 +240,10 @@ async def style_guide_callback(
                 generation_id,
                 exc,
             )
-            try:
-                await status.delete()
-            except Exception:
-                pass
             failed_copy = (
                 copy.premium_showcase_failed if showcase else copy.premium_style_guide_failed
             )
-            await callback.message.answer(failed_copy)
+            await generation_status.fail(failed_copy)
     finally:
         _style_guide_in_progress.discard(in_progress_key)
 

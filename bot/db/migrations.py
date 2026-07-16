@@ -19,6 +19,8 @@ MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN premium_offer_paused_until TEXT",
     "ALTER TABLE users ADD COLUMN premium_offer_last_shown_at TEXT",
     "ALTER TABLE users ADD COLUMN premium_showcase_used_at TEXT",
+    "ALTER TABLE users ADD COLUMN active_look_generation_id INTEGER",
+    "ALTER TABLE users ADD COLUMN waiting_look_add_item INTEGER NOT NULL DEFAULT 0",
 ]
 
 NEW_TABLES = """

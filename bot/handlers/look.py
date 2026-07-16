@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import time
 
@@ -24,12 +23,16 @@ from bot.keyboards import (
     guide_button_keyboard,
     look_cart_keyboard,
     paywall_keyboard,
-    shop_keyboard,
+    waiting_add_item_keyboard,
 )
 from bot.services.analytics import Analytics
 from bot.services.drip import DripService
 from bot.services.generation_guard import GenerationGuard
-from bot.services.image_processor import PhotoValidationError
+from bot.services.generation_status import send_generation_status
+from bot.services.image_processor import (
+    PhotoValidationError,
+    validate_and_process_garment_photo,
+)
 from bot.services.look_cart import LookCartService
 from bot.services.openrouter import FileStorage, OpenRouterClient, TryOnError
 from bot.services.proactive_guard import ProactiveGuard
@@ -43,11 +46,15 @@ router = Router(name="look")
     ~StateFilter(Onboarding.collecting_photos),
     ~StateFilter(PhotosAdding.adding),
 )
-async def add_garment_to_cart(
+async def on_clothing_photo(
     message: Message,
     bot: Bot,
     db: Database,
+    settings: Settings,
     storage: FileStorage,
+    openrouter: OpenRouterClient,
+    drip: DripService,
+    proactive_guard: ProactiveGuard,
 ) -> None:
     ok, error = await _user_ready(db, message.from_user.id)
     if not ok:
@@ -55,6 +62,22 @@ async def add_garment_to_cart(
         return
 
     user = await db.fetch_user(message.from_user.id)
+    state = await db.get_active_look_state(user["id"])
+    if state["waiting_look_add_item"]:
+        await _run_add_item_generation(
+            message,
+            bot,
+            db,
+            settings,
+            storage,
+            openrouter,
+            drip,
+            proactive_guard,
+            user,
+            int(state["active_look_generation_id"] or 0),
+        )
+        return
+
     photo = message.photo[-1]
     file = await bot.get_file(photo.file_id)
     raw = (await bot.download_file(file.file_path)).read()
@@ -94,7 +117,7 @@ async def look_clear(callback: CallbackQuery, db: Database) -> None:
     if not user:
         await callback.answer()
         return
-    await db.clear_look_cart(user["id"])
+    await db.clear_look_completely(user["id"])
     await callback.message.answer(active_copy().look_cleared)
     await callback.answer()
 
@@ -103,6 +126,40 @@ async def look_clear(callback: CallbackQuery, db: Database) -> None:
 async def look_add_hint(callback: CallbackQuery) -> None:
     await callback.message.answer("Send another clothing photo 👗")
     await callback.answer()
+
+
+@router.callback_query(F.data.startswith("look:add_item:"))
+async def look_add_item(callback: CallbackQuery, db: Database) -> None:
+    copy = active_copy()
+    user = await db.fetch_user(callback.from_user.id)
+    if not user:
+        await callback.answer(copy.send_start_first, show_alert=True)
+        return
+
+    try:
+        gen_id = int(callback.data.split(":")[-1])
+    except (TypeError, ValueError):
+        await callback.answer(copy.look_add_item_no_active, show_alert=True)
+        return
+
+    generation = await db.get_generation(gen_id, user["id"])
+    if not generation or not generation["result_path"]:
+        await callback.answer(copy.look_add_item_no_active, show_alert=True)
+        return
+
+    await db.set_active_look(user["id"], gen_id)
+    await db.set_waiting_look_add_item(user["id"], True)
+    await callback.message.answer(
+        copy.look_add_item_prompt,
+        parse_mode="Markdown",
+        reply_markup=waiting_add_item_keyboard(),
+    )
+    await callback.answer()
+    await Analytics(db).track(
+        callback.from_user.id,
+        "look_add_item_started",
+        json.dumps({"generation_id": gen_id}),
+    )
 
 
 @router.callback_query(F.data == "look:generate")
@@ -172,7 +229,11 @@ async def look_generate(
     garment_bytes_list = [storage.read(p) for p in paths]
     garment_path = paths[0] if len(paths) == 1 else ",".join(paths)
 
-    status = await callback.message.answer(generating)
+    generation_status = await send_generation_status(
+        callback.message,
+        sticker_id=settings.generating_sticker_id,
+        text=generating,
+    )
     await callback.answer()
 
     try:
@@ -182,7 +243,7 @@ async def look_generate(
     except TryOnError as exc:
         guard.circuit_breaker.record_failure()
         await db.add_credits(telegram_id, 1)
-        await status.edit_text(copy.generation_failed.format(error=exc))
+        await generation_status.fail(copy.generation_failed.format(error=exc))
         await analytics.track(
             telegram_id,
             "look_failed",
@@ -202,6 +263,8 @@ async def look_generate(
         mode="cart",
     )
     await svc.clear(user["id"])
+    await db.set_waiting_look_add_item(user["id"], False)
+    await db.set_active_look(user["id"], gen_id)
 
     referrals = ReferralService(db)
     await referrals.on_first_tryon(telegram_id)
@@ -220,7 +283,7 @@ async def look_generate(
         gen_count,
     )
 
-    await status.delete()
+    await generation_status.complete()
     caption, keyboard = build_result_message(
         remaining, total_purchases, gen_id, cost=await db.get_style_guide_cost(telegram_id)
     )
@@ -237,6 +300,148 @@ async def look_generate(
         telegram_id,
         "look_generated",
         json.dumps({"garment_count": garment_count}),
+    )
+    schedule_style_guide_offer_task(
+        bot, db, proactive_guard, settings, telegram_id, gen_id, remaining
+    )
+
+
+async def _run_add_item_generation(
+    message: Message,
+    bot: Bot,
+    db: Database,
+    settings: Settings,
+    storage: FileStorage,
+    openrouter: OpenRouterClient,
+    drip: DripService,
+    proactive_guard: ProactiveGuard,
+    user,
+    active_gen_id: int,
+) -> None:
+    copy = active_copy()
+    telegram_id = message.from_user.id
+    analytics = Analytics(db)
+
+    if active_gen_id <= 0:
+        await db.set_waiting_look_add_item(user["id"], False)
+        await message.answer(copy.look_add_item_no_active)
+        return
+
+    generation = await db.get_generation(active_gen_id, user["id"])
+    if not generation or not generation["result_path"]:
+        await db.clear_look_completely(user["id"])
+        await message.answer(copy.look_add_item_no_active)
+        return
+
+    balance = await db.get_balance(telegram_id)
+    total_purchases = int(user["total_purchases"])
+    if balance < 1:
+        await db.set_waiting_look_add_item(user["id"], False)
+        if total_purchases == 0:
+            await message.answer(copy.paywall, reply_markup=paywall_keyboard())
+        else:
+            await message.answer(
+                copy.deficit,
+                parse_mode="Markdown",
+                reply_markup=deficit_keyboard(),
+            )
+        return
+
+    guard = GenerationGuard(db)
+    if guard.circuit_breaker.is_open():
+        await message.answer(copy.circuit_open)
+        return
+
+    photo = message.photo[-1]
+    file = await bot.get_file(photo.file_id)
+    raw = (await bot.download_file(file.file_path)).read()
+    try:
+        garment_bytes = validate_and_process_garment_photo(raw)
+    except PhotoValidationError as exc:
+        await message.answer(str(exc), reply_markup=guide_button_keyboard())
+        return
+
+    if not await db.deduct_credit(telegram_id):
+        await message.answer(copy.not_enough_credits)
+        return
+
+    await db.set_waiting_look_add_item(user["id"], False)
+
+    generation_ts = int(time.time())
+    garment_path = str(
+        storage.save_garment_photo(telegram_id, generation_ts, garment_bytes)
+    )
+    result_bytes_base = storage.read(generation["result_path"])
+
+    generation_status = await send_generation_status(
+        message,
+        sticker_id=settings.generating_sticker_id,
+        text=copy.look_add_item_generating,
+    )
+
+    try:
+        result_bytes = await openrouter.generate_add_item_tryon(
+            result_bytes_base, garment_bytes
+        )
+    except TryOnError as exc:
+        guard.circuit_breaker.record_failure()
+        await db.add_credits(telegram_id, 1)
+        await db.set_waiting_look_add_item(user["id"], True)
+        await generation_status.fail(copy.generation_failed.format(error=exc))
+        await analytics.track(
+            telegram_id,
+            "look_add_item_failed",
+            json.dumps({"parent_generation_id": active_gen_id}),
+        )
+        return
+
+    guard.circuit_breaker.record_success()
+    result_path = storage.save_result_photo(
+        telegram_id, generation_ts, result_bytes
+    )
+    gen_id = await db.record_generation(
+        user["id"],
+        garment_path,
+        str(result_path),
+        garment_count=1,
+        mode="add_item",
+    )
+    await db.set_active_look(user["id"], gen_id)
+
+    referrals = ReferralService(db)
+    await referrals.on_first_tryon(telegram_id)
+
+    remaining = await db.get_balance(telegram_id)
+    gen_count = await db.count_generations(user["id"])
+
+    await _handle_drip_triggers(
+        drip,
+        db,
+        analytics,
+        telegram_id,
+        user["id"],
+        remaining,
+        total_purchases,
+        gen_count,
+    )
+
+    await generation_status.complete()
+    caption, keyboard = build_result_message(
+        remaining, total_purchases, gen_id, cost=await db.get_style_guide_cost(telegram_id)
+    )
+    await _track_paywall_if_needed(
+        message, db, analytics, remaining, total_purchases
+    )
+    await message.answer_photo(
+        BufferedInputFile(result_bytes, filename="tryon.jpg"),
+        caption=caption,
+        parse_mode="Markdown",
+        reply_markup=keyboard,
+    )
+    await analytics.track(
+        telegram_id,
+        "look_add_item_generated",
+        json.dumps({"parent_generation_id": active_gen_id, "generation_id": gen_id}),
     )
     schedule_style_guide_offer_task(
         bot, db, proactive_guard, settings, telegram_id, gen_id, remaining

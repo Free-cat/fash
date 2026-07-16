@@ -37,6 +37,7 @@ def _test_settings(tmp_path: Path) -> Settings:
         guide_photo_path=tmp_path / "guide.jpg",
         demo_image_path=tmp_path / "demo.jpg",
         premium_preview_path=preview,
+        generating_sticker_id=None,
         use_webhook=False,
     )
 
@@ -62,8 +63,17 @@ def test_result_keyboard_style_guide_is_first_row():
     first_btn = kb.inline_keyboard[0][0]
     assert first_btn.callback_data == "styleguide:42"
     assert first_btn.text.endswith("1")
-    share_btn = kb.inline_keyboard[1][0]
-    assert share_btn.switch_inline_query is not None
+    callbacks = [
+        btn.callback_data
+        for row in kb.inline_keyboard
+        for btn in row
+        if btn.callback_data
+    ]
+    assert callbacks[1] == "look:add_item:42"
+    assert callbacks[2] == "look:clear"
+    assert "action:try_another" in callbacks
+    assert "action:invite" not in callbacks
+    assert all(btn.switch_inline_query is None for row in kb.inline_keyboard for btn in row)
 
 
 def test_result_keyboard_omits_style_guide_without_cost():
@@ -76,6 +86,7 @@ def test_result_keyboard_omits_style_guide_without_cost():
         if btn.callback_data
     ]
     assert not any(c and c.startswith("styleguide:") for c in callbacks)
+    assert callbacks == ["look:add_item:42", "look:clear", "action:try_another"]
 
 
 def test_premium_offer_copy_mentions_three_tryons():

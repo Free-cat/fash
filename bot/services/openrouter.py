@@ -505,6 +505,155 @@ def build_style_guide_prompt() -> str:
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
+def build_add_item_tryon_prompt() -> str:
+    """Add one garment onto an already generated try-on result."""
+    payload = {
+        "task": "virtual_try_on_add_item",
+        "role": "expert virtual stylist and photorealistic image compositor",
+        "inputs": {
+            "image_1": "current try-on result — person already wearing an outfit",
+            "image_2": "new garment / clothing item to add to the existing look",
+        },
+        "goal": (
+            "Keep the person and existing outfit from image_1 exactly as they are, "
+            "and add the garment from image_2 as a new layer on that same look. "
+            "Output one photorealistic photo of that same person in the updated outfit."
+        ),
+        "identity_lock": {
+            "keep_exact": [
+                "face",
+                "facial_features",
+                "hair",
+                "skin_tone",
+                "body_shape",
+                "body_proportions",
+                "pose",
+                "stance",
+                "camera_angle",
+                "background",
+                "lighting_direction",
+            ],
+            "do_not": [
+                "change_identity",
+                "beautify_face",
+                "alter_age",
+                "change_gender_presentation",
+                "replace_background",
+                "rebuild_outfit_from_scratch",
+            ],
+        },
+        "preserve": {
+            "existing_outfit": (
+                "Keep every currently worn garment, color, pattern, fit, and accessory "
+                "from image_1 unless image_2 clearly replaces the same clothing category"
+            ),
+            "current_outfit": "do not strip or redesign items already on the person",
+        },
+        "garment_rules": {
+            "apply": "add the clothing item from image_2 onto the person in image_1",
+            "match": [
+                "color",
+                "pattern",
+                "texture",
+                "silhouette",
+                "length",
+                "neckline",
+                "sleeves",
+                "fabric_drape",
+            ],
+            "fit": "natural body-conforming fit with realistic wrinkles and shadows",
+            "layering": (
+                "If image_2 is outerwear, layer it over the current top. "
+                "If it is shoes or an accessory, add it without changing the rest of the outfit. "
+                "If it clearly replaces the same category (e.g. a new top), swap only that category."
+            ),
+            "if_garment_on_model": (
+                "extract the full visible item, including shoes and accessories when present; "
+                "ignore the other person's body, face, pose, and background"
+            ),
+        },
+        "edit_scope": (
+            "Change only what is needed to integrate image_2 into the current look. "
+            "Keep all other person and background pixels as close to image_1 as possible."
+        ),
+        "quality": {
+            "style": "photorealistic fashion photo",
+            "lighting": "natural, consistent with image_1",
+            "details": [
+                "sharp fabric texture",
+                "realistic shadows under garment",
+                "correct perspective",
+                "no plastic skin",
+                "no warped limbs",
+                "no extra fingers",
+                "no text overlays",
+                "no watermarks",
+            ],
+        },
+        "output": {
+            "count": 1,
+            "type": "single_image",
+            "format": "photorealistic_try_on_result",
+        },
+        "negative": [
+            "rebuilt outfit from scratch",
+            "lost previous garments",
+            "second person",
+            "mannequin",
+            "flat lay only",
+            "cartoon",
+            "anime",
+            "low resolution",
+            "blurry",
+            "distorted anatomy",
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def build_add_item_tryon_request_payload(
+    model: str,
+    result_image: bytes,
+    garment_image: bytes,
+) -> dict:
+    return {
+        "model": model,
+        "modalities": ["image", "text"],
+        "image_config": {
+            "aspect_ratio": TRYON_ASPECT_RATIO,
+            "image_size": TRYON_IMAGE_SIZE,
+        },
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": build_add_item_tryon_prompt()},
+                    {
+                        "type": "text",
+                        "text": "Image 1 — current try-on result (keep this look):",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": _as_data_uri(result_image, "image/jpeg"),
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": "Image 2 — new garment to add:",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": _as_data_uri(garment_image, "image/jpeg"),
+                        },
+                    },
+                ],
+            }
+        ],
+    }
+
+
 def build_tryon_request_payload(
     model: str,
     person_image: bytes,
@@ -662,6 +811,33 @@ class OpenRouterClient:
 
         payload = build_outfit_tryon_request_payload(
             self.model, person, garments
+        )
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/primerka_bot",
+            "X-Title": "FitRoom Try-On Bot",
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                OPENROUTER_URL, json=payload, headers=headers, timeout=120
+            ) as response:
+                body = await response.json()
+                if response.status >= 400:
+                    message = body.get("error", {}).get("message", str(body))
+                    raise TryOnError(f"OpenRouter error: {message}")
+
+        image_bytes = _extract_image_bytes(body)
+        if not image_bytes:
+            raise TryOnError("Model returned no image. Try different photos.")
+        return image_bytes
+
+    async def generate_add_item_tryon(
+        self, result_image: bytes, garment_image: bytes
+    ) -> bytes:
+        payload = build_add_item_tryon_request_payload(
+            self.model, result_image, garment_image
         )
         headers = {
             "Authorization": f"Bearer {self.api_key}",

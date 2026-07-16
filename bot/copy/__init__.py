@@ -36,6 +36,7 @@ class Copy:
     btn_help: str
     btn_see_on_me: str
     btn_add_item: str
+    btn_add_to_look: str
     btn_clear_look: str
     btn_photo_guide: str
     btn_upload_person: str
@@ -104,6 +105,9 @@ class Copy:
     look_one_item_hint: str
     look_full: str
     look_cleared: str
+    look_add_item_prompt: str
+    look_add_item_generating: str
+    look_add_item_no_active: str
     look_generating_one: str
     look_generating_many: str
     photo_switched: str

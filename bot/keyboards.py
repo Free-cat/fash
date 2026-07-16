@@ -93,24 +93,29 @@ def result_keyboard(
     rows: list[list[InlineKeyboardButton]] = []
     if cost is not None and generation_id > 0:
         rows.append([_style_guide_button(generation_id, cost)])
-    rows.extend(
+    if generation_id > 0:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=copy.btn_add_to_look,
+                    callback_data=f"look:add_item:{generation_id}",
+                )
+            ]
+        )
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=copy.btn_clear_look,
+                    callback_data="look:clear",
+                )
+            ]
+        )
+    rows.append(
         [
-            [
-                InlineKeyboardButton(
-                    text=copy.btn_share,
-                    switch_inline_query=copy.share_inline_query,
-                ),
-            ],
-            [
-                InlineKeyboardButton(
-                    text=copy.btn_try_another,
-                    callback_data="action:try_another",
-                ),
-                InlineKeyboardButton(
-                    text=copy.btn_invite,
-                    callback_data="action:invite",
-                ),
-            ],
+            InlineKeyboardButton(
+                text=copy.btn_try_another,
+                callback_data="action:try_another",
+            ),
         ]
     )
     if balance <= 2:
@@ -123,6 +128,20 @@ def result_keyboard(
             ]
         )
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def waiting_add_item_keyboard() -> InlineKeyboardMarkup:
+    copy = active_copy()
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=copy.btn_clear_look,
+                    callback_data="look:clear",
+                )
+            ]
+        ]
+    )
 
 
 def paywall_keyboard(

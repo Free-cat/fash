@@ -31,6 +31,7 @@ async def test_onboarding_completes_after_one_photo(tmp_path, monkeypatch):
         guide_photo_path=tmp_path / "guide.jpg",
         demo_image_path=tmp_path / "demo.jpg",
         premium_preview_path=tmp_path / "premium_preview.jpg",
+        generating_sticker_id=None,
         use_webhook=False,
     )
 
