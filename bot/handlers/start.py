@@ -10,7 +10,13 @@ from bot.copy import active_copy
 from bot.db.database import Database
 from bot.filters import TextIs
 from bot.handlers.photos import Onboarding
-from bot.keyboards import draft_look_keyboard, main_keyboard, welcome_keyboard
+from bot.keyboards import (
+    draft_look_keyboard,
+    main_keyboard,
+    paywall_keyboard,
+    shop_keyboard,
+    welcome_keyboard,
+)
 from bot.services.analytics import Analytics
 from bot.services.referrals import ReferralService, parse_start_payload
 
@@ -81,14 +87,22 @@ async def cmd_start(message: Message, state: FSMContext, db: Database, settings:
 @router.message(TextIs("btn_help"))
 async def cmd_help(message: Message, settings: Settings, db: Database) -> None:
     await send_demo_visual(message, settings, db)
-    await message.answer(active_copy().help_text, reply_markup=main_keyboard())
+    await message.answer(
+        active_copy().help_text,
+        parse_mode="Markdown",
+        reply_markup=main_keyboard(),
+    )
 
 
 @router.message(Command("balance"))
 @router.message(TextIs("btn_balance"))
 async def cmd_balance(message: Message, db: Database) -> None:
+    copy = active_copy()
     balance = await db.get_balance(message.from_user.id)
-    await message.answer(
-        active_copy().balance_text.format(balance=balance),
-        reply_markup=main_keyboard(),
-    )
+    if balance <= 0:
+        text = copy.balance_empty
+        keyboard = paywall_keyboard()
+    else:
+        text = copy.balance_text.format(balance=balance)
+        keyboard = shop_keyboard()
+    await message.answer(text, parse_mode="Markdown", reply_markup=keyboard)

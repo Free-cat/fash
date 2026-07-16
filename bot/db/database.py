@@ -292,7 +292,29 @@ class Database:
             "premium_offer_ignored_count": int(row["premium_offer_ignored_count"] or 0),
             "premium_offer_paused_until": row["premium_offer_paused_until"],
             "premium_offer_last_shown_at": row["premium_offer_last_shown_at"],
+            "premium_showcase_used_at": row["premium_showcase_used_at"],
         }
+
+    async def is_premium_showcase_available(self, telegram_id: int) -> bool:
+        row = await self.fetch_user(telegram_id)
+        return row is not None and row["premium_showcase_used_at"] is None
+
+    async def get_style_guide_cost(self, telegram_id: int) -> int:
+        from bot.services.premium_offer import style_guide_cost
+
+        showcase = await self.is_premium_showcase_available(telegram_id)
+        return style_guide_cost(showcase_available=showcase)
+
+    async def mark_premium_showcase_used(self, telegram_id: int) -> None:
+        await self.conn.execute(
+            """
+            UPDATE users
+            SET premium_showcase_used_at = datetime('now')
+            WHERE telegram_id = ? AND premium_showcase_used_at IS NULL
+            """,
+            (telegram_id,),
+        )
+        await self.conn.commit()
 
     async def assign_premium_offer_variant(self, telegram_id: int, variant: int) -> None:
         await self.conn.execute(

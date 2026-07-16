@@ -20,7 +20,8 @@ COPY = Copy(
     ),
     photo_ready=(
         "Your fitting room is ready 🎉\n"
-        "You have *{free_credits} free try-ons*. Send any clothing photo!"
+        "You have *{free_credits} free try-ons*.\n\n"
+        "👉 *Send a clothing photo* — dress, jacket, anything — and see it on *you*."
     ),
     generating="Styling your look… this takes about 15 sec ✨",
     result_caption="This is *you* in that outfit 🔥",
@@ -34,10 +35,6 @@ COPY = Copy(
         "Out again? You must be into this 😏\n"
         "This time — Popular: 15 try-ons for 799⭐ "
         "(cheaper per try-on than last time)"
-    ),
-    privacy_note=(
-        "🔒 Photos are stored securely and used only for try-on. "
-        "Delete anytime with /delete_my_data"
     ),
     drip_opt_out="Stop reminders",
     guide_caption=(
@@ -79,6 +76,7 @@ COPY = Copy(
     btn_share="📤 Share with friends",
     btn_buy_credits="⭐ Buy credits",
     btn_style_guide="✨ Full styling — 3",
+    btn_style_guide_showcase="✨ Full styling — 1",
     btn_use_photo="✓ Use this for try-ons",
     btn_photo_active="✓ Active for try-ons",
     style_guide_offer=(
@@ -104,15 +102,27 @@ COPY = Copy(
         "9 looks with this piece, exact palette, accessory picks — "
         "the full pro-styling package."
     ),
+    premium_showcase_offer_v1=(
+        "Your first full styling — 9 looks, palette & accessories "
+        "for this piece. *Just 1 try-on.*"
+    ),
+    premium_showcase_offer_v2=(
+        "Try the full pro-styling package once — 9 looks with this piece, "
+        "your palette & accessory picks. *1 try-on today.*"
+    ),
     premium_offer_preview_caption=(
         "Here's what you get — yours will be styled with this look"
     ),
     premium_offer_cross_sell=(
-        "Full styling takes 3 try-ons — you have {balance}. "
+        "Full styling takes {cost} try-ons — you have {balance}. "
         "Grab a pack or invite a friend, then give it a go 👇"
     ),
     premium_style_guide_failed=(
         "Couldn't put the styling board together — I've refunded all 3 try-ons. "
+        "Want to try again?"
+    ),
+    premium_showcase_failed=(
+        "Couldn't put the styling board together — I've refunded your try-on. "
         "Want to try again?"
     ),
     shop_most_chosen="Most chosen",
@@ -140,8 +150,16 @@ COPY = Copy(
         "/shop — buy credit packs with Telegram Stars\n"
         "/photos — re-upload your photos"
     ),
-    balance_text="Balance: {balance} credit(s).\n1 credit = 1 try-on.",
-    balance_line="1 credit = 1 try-on.",
+    balance_text=(
+        "You have *{balance} try-on(s)* left.\n\n"
+        "Top up now — bigger packs cost less per look 👇"
+    ),
+    balance_empty=(
+        "You're out of try-ons 👀\n\n"
+        "Grab a pack and keep styling — bigger packs cost less per look.\n"
+        "Or invite a friend for *+1 free* ✨"
+    ),
+    balance_line="1 try-on = 1 look on you.",
     try_on_hint="Send a clothing photo to try it on 👗\n1 try-on · Balance: {balance}",
     circuit_open=(
         "The fitting room's briefly busy 🙈 Give it a couple of minutes and try again — your try-ons are safe."

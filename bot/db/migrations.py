@@ -18,6 +18,7 @@ MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN premium_offer_ignored_count INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE users ADD COLUMN premium_offer_paused_until TEXT",
     "ALTER TABLE users ADD COLUMN premium_offer_last_shown_at TEXT",
+    "ALTER TABLE users ADD COLUMN premium_showcase_used_at TEXT",
 ]
 
 NEW_TABLES = """

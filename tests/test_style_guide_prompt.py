@@ -28,7 +28,7 @@ def test_style_guide_request_uses_images_api_with_gpt_image_2():
     payload = build_style_guide_request_payload(
         DEFAULT_STYLE_GUIDE_MODEL, b"result"
     )
-    assert payload["model"] == DEFAULT_STYLE_GUIDE_MODEL == "openai/gpt-image-2"
+    assert payload["model"] == DEFAULT_STYLE_GUIDE_MODEL == "google/gemini-3-pro-image"
     assert payload["aspect_ratio"] == STYLE_GUIDE_ASPECT_RATIO == "1:1"
     assert payload["resolution"] == "1K"
     assert payload["quality"] == "high"

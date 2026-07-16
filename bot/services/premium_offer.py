@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+PREMIUM_SHOWCASE_COST = 1
 PREMIUM_STYLE_GUIDE_COST = 3
 PREMIUM_OFFER_DELAY_SECONDS = 12
+
+
+def style_guide_cost(*, showcase_available: bool) -> int:
+    return PREMIUM_SHOWCASE_COST if showcase_available else PREMIUM_STYLE_GUIDE_COST
 
 _pending: dict[int, int] = {}
 _consumed: set[int] = set()

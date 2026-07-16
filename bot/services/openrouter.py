@@ -16,8 +16,8 @@ OPENROUTER_IMAGES_URL = "https://openrouter.ai/api/v1/images"
 # - google/gemini-2.5-flash-image  — cheaper fallback
 # - google/gemini-3-pro-image      — highest quality, ~4× cost
 DEFAULT_TRYON_MODEL = "google/gemini-3.1-flash-image"
-# Style guide boards: dedicated Images API (editorial layout, labels, palette)
-DEFAULT_STYLE_GUIDE_MODEL = "openai/gpt-image-2"
+# Style guide boards: gemini-3-pro-image for highest quality editorial layout
+DEFAULT_STYLE_GUIDE_MODEL = "google/gemini-3-pro-image"
 TRYON_ASPECT_RATIO = "3:4"
 TRYON_IMAGE_SIZE = "1K"
 STYLE_GUIDE_ASPECT_RATIO = "1:1"

@@ -203,13 +203,14 @@ def draft_look_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def style_guide_offer_keyboard(generation_id: int) -> InlineKeyboardMarkup:
+def style_guide_offer_keyboard(generation_id: int, *, cost: int) -> InlineKeyboardMarkup:
     copy = active_copy()
+    button_text = copy.btn_style_guide_showcase if cost == 1 else copy.btn_style_guide
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=copy.btn_style_guide,
+                    text=button_text,
                     callback_data=f"styleguide:{generation_id}",
                 ),
             ],

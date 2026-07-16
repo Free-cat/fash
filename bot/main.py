@@ -90,6 +90,10 @@ async def _run_polling(bot: Bot, dp: Dispatcher) -> None:
     await dp.start_polling(bot)
 
 
+async def _health(_request: web.Request) -> web.Response:
+    return web.Response(text="ok")
+
+
 async def _run_webhook(bot: Bot, dp: Dispatcher, settings: Settings) -> None:
     if not settings.webhook_url:
         raise ValueError("WEBHOOK_URL is required when USE_WEBHOOK=true")
@@ -101,6 +105,7 @@ async def _run_webhook(bot: Bot, dp: Dispatcher, settings: Settings) -> None:
     )
 
     app = web.Application()
+    app.router.add_get("/health", _health)
     webhook_handler = SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,

@@ -187,7 +187,6 @@ async def _save_person_photo(
             parse_mode="Markdown",
             reply_markup=main_keyboard(),
         )
-        await message.answer(copy.privacy_note)
         return
 
     await message.answer(copy.photo_progress_optional.format(count=new_count))

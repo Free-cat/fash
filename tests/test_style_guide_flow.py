@@ -81,7 +81,57 @@ def test_premium_offer_copy_mentions_three_tryons():
     copy = active_copy()
     assert "3" in copy.premium_offer_v1
     assert "3" in copy.btn_style_guide
+    assert "1" in copy.btn_style_guide_showcase
+    assert "1" in copy.premium_showcase_offer_v1
 
+
+@pytest.mark.asyncio
+async def test_schedule_showcase_offer_when_balance_one(tmp_path):
+    init_copy("en")
+    db = Database(tmp_path / "test.db")
+    await db.connect()
+    user = await db.get_or_create_user(telegram_id=444, username="test", free_credits=1)
+    gen_id = await db.record_generation(user["id"], "/g.jpg", "/r.jpg")
+    guard = MagicMock()
+    guard.can_send = AsyncMock(return_value=True)
+    settings = _test_settings(tmp_path)
+
+    bot = AsyncMock()
+    with patch("bot.handlers.styleguide.asyncio.sleep", new_callable=AsyncMock):
+        await schedule_style_guide_offer(
+            bot, db, guard, settings, 444, gen_id, balance=1
+        )
+    bot.send_photo.assert_called_once()
+    caption = bot.send_photo.call_args.kwargs.get("caption", "")
+    assert "1 try-on" in caption.lower()
+    keyboard = bot.send_photo.call_args.kwargs.get("reply_markup")
+    assert keyboard.inline_keyboard[0][0].text.endswith("1")
+    await db.close()
+
+
+@pytest.mark.asyncio
+async def test_schedule_premium_offer_after_showcase_used(tmp_path):
+    init_copy("en")
+    db = Database(tmp_path / "test.db")
+    await db.connect()
+    user = await db.get_or_create_user(telegram_id=333, username="test", free_credits=5)
+    await db.mark_premium_showcase_used(333)
+    gen_id = await db.record_generation(user["id"], "/g.jpg", "/r.jpg")
+    guard = MagicMock()
+    guard.can_send = AsyncMock(return_value=True)
+    settings = _test_settings(tmp_path)
+
+    bot = AsyncMock()
+    with patch("bot.handlers.styleguide.asyncio.sleep", new_callable=AsyncMock):
+        await schedule_style_guide_offer(
+            bot, db, guard, settings, 333, gen_id, balance=5
+        )
+    bot.send_photo.assert_called_once()
+    caption = bot.send_photo.call_args.kwargs.get("caption", "")
+    assert "stylist" in caption.lower() or "9 looks" in caption.lower()
+    keyboard = bot.send_photo.call_args.kwargs.get("reply_markup")
+    assert keyboard.inline_keyboard[0][0].text.endswith("3")
+    await db.close()
 
 def test_save_style_guide_photo(tmp_path):
     storage = FileStorage(tmp_path / "storage")
@@ -127,7 +177,7 @@ async def test_schedule_style_guide_offer_sends_cross_sell_when_low_balance(tmp_
             bot, db, guard, settings, 888, gen_id, balance=0
         )
     bot.send_message.assert_called_once()
-    assert "3" in bot.send_message.call_args.args[1]
+    assert "1 try-on" in bot.send_message.call_args.args[1]
     await db.close()
 
 
@@ -173,7 +223,7 @@ async def test_schedule_premium_offer_sends_ab_variant(tmp_path):
         )
     bot.send_photo.assert_called_once()
     caption = bot.send_photo.call_args.kwargs.get("caption", "")
-    assert "stylist" in caption.lower() or "outfit" in caption.lower()
+    assert "9 looks" in caption.lower() or "stylist" in caption.lower()
     await db.close()
 
 

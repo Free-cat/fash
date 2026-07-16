@@ -20,7 +20,6 @@ from bot.services.generation_guard import GenerationGuard
 from bot.services.openrouter import FileStorage, OpenRouterClient, TryOnError
 from bot.services.premium_offer import (
     PREMIUM_OFFER_DELAY_SECONDS,
-    PREMIUM_STYLE_GUIDE_COST,
     assign_variant,
     clear_pending,
     register_pending,
@@ -82,8 +81,35 @@ async def _resolve_variant(db: Database, telegram_id: int) -> int:
     return variant
 
 
-def _premium_offer_text(copy, variant: int) -> str:
+def _premium_offer_text(copy, variant: int, *, showcase: bool) -> str:
+    if showcase:
+        return (
+            copy.premium_showcase_offer_v1
+            if variant == 1
+            else copy.premium_showcase_offer_v2
+        )
     return copy.premium_offer_v1 if variant == 1 else copy.premium_offer_v2
+
+
+def _premium_analytics_event(*, showcase: bool, action: str, variant: int) -> str:
+    prefix = "premium_showcase" if showcase else "premium_offer"
+    if showcase and action == "shown":
+        return f"{prefix}_offer_shown_v{variant}"
+    return f"{prefix}_{action}_v{variant}"
+
+
+def _premium_cross_sell(copy, balance: int, cost: int) -> str:
+    if copy.locale == "ru":
+        need = "нужна 1 примерка" if cost == 1 else f"нужно {cost} примерки"
+        return (
+            f"Для полного стайлинга {need}, у тебя {balance}. "
+            "Докупи или позови друга — и попробуй 👇"
+        )
+    unit = "try-on" if cost == 1 else "try-ons"
+    return (
+        f"Full styling takes {cost} {unit} — you have {balance}. "
+        "Grab a pack or invite a friend, then give it a go 👇"
+    )
 
 
 @router.callback_query(F.data.startswith("styleguide:"))
@@ -113,7 +139,12 @@ async def style_guide_callback(
 
     analytics = Analytics(db)
     variant = await _resolve_variant(db, telegram_id)
-    await analytics.track(telegram_id, f"premium_offer_purchased_v{variant}")
+    cost = await db.get_style_guide_cost(telegram_id)
+    showcase = cost == 1
+    await analytics.track(
+        telegram_id,
+        _premium_analytics_event(showcase=showcase, action="purchased", variant=variant),
+    )
 
     if generation["style_guide_path"]:
         style_bytes = storage.read(generation["style_guide_path"])
@@ -125,29 +156,30 @@ async def style_guide_callback(
         return
 
     balance = await db.get_balance(telegram_id)
-    if balance < PREMIUM_STYLE_GUIDE_COST:
+    if balance < cost:
         user = await db.fetch_user(telegram_id)
         total_purchases = int(user["total_purchases"]) if user else 0
+        cross_sell = _premium_cross_sell(copy, balance, cost)
         if total_purchases == 0:
             await callback.message.answer(
-                copy.premium_offer_cross_sell.format(balance=balance),
+                cross_sell,
                 reply_markup=paywall_keyboard(),
             )
         else:
             await callback.message.answer(
-                copy.premium_offer_cross_sell.format(balance=balance),
+                cross_sell,
                 reply_markup=deficit_keyboard(),
             )
         await callback.answer()
         return
 
-    if not await db.deduct_credits(telegram_id, PREMIUM_STYLE_GUIDE_COST):
+    if not await db.deduct_credits(telegram_id, cost):
         await callback.answer(copy.not_enough_credits, show_alert=True)
         return
 
     guard = GenerationGuard(db)
     if guard.circuit_breaker.is_open():
-        await db.add_credits(telegram_id, PREMIUM_STYLE_GUIDE_COST)
+        await db.add_credits(telegram_id, cost)
         await callback.message.answer(copy.circuit_open)
         await callback.answer()
         return
@@ -170,6 +202,8 @@ async def style_guide_callback(
                 telegram_id, generation_id, guide_bytes
             )
             await db.set_style_guide_path(generation_id, user_id, str(guide_path))
+            if showcase:
+                await db.mark_premium_showcase_used(telegram_id)
 
             remaining = await db.get_balance(telegram_id)
             await analytics.track(telegram_id, "style_guide_generated")
@@ -182,7 +216,7 @@ async def style_guide_callback(
             )
         except TryOnError as exc:
             guard.circuit_breaker.record_failure()
-            await db.add_credits(telegram_id, PREMIUM_STYLE_GUIDE_COST)
+            await db.add_credits(telegram_id, cost)
             await analytics.track(telegram_id, "style_guide_failed")
             logger.error(
                 "Style guide generation failed for user %s gen %s: %s",
@@ -194,7 +228,10 @@ async def style_guide_callback(
                 await status.delete()
             except Exception:
                 pass
-            await callback.message.answer(copy.premium_style_guide_failed)
+            failed_copy = (
+                copy.premium_showcase_failed if showcase else copy.premium_style_guide_failed
+            )
+            await callback.message.answer(failed_copy)
     finally:
         _style_guide_in_progress.discard(in_progress_key)
 
@@ -229,19 +266,21 @@ async def schedule_style_guide_offer(
         balance = await db.get_balance(telegram_id)
         copy = active_copy()
         analytics = Analytics(db)
+        cost = await db.get_style_guide_cost(telegram_id)
+        showcase = cost == 1
 
-        if balance < PREMIUM_STYLE_GUIDE_COST:
+        if balance < cost:
             await bot.send_message(
                 telegram_id,
-                copy.premium_offer_cross_sell.format(balance=balance),
+                _premium_cross_sell(copy, balance, cost),
                 reply_markup=paywall_keyboard(),
             )
             return
 
         variant = await _resolve_variant(db, telegram_id)
-        offer_text = _premium_offer_text(copy, variant)
+        offer_text = _premium_offer_text(copy, variant, showcase=showcase)
         state = await db.get_premium_offer_state(telegram_id)
-        keyboard = style_guide_offer_keyboard(generation_id)
+        keyboard = style_guide_offer_keyboard(generation_id, cost=cost)
 
         if not state.get("premium_offer_shown_once"):
             if settings.premium_preview_path.exists():
@@ -250,23 +289,29 @@ async def schedule_style_guide_offer(
                     FSInputFile(settings.premium_preview_path),
                     caption=f"{copy.premium_offer_preview_caption}\n\n{offer_text}",
                     reply_markup=keyboard,
+                    parse_mode="Markdown",
                 )
             else:
                 await bot.send_message(
                     telegram_id,
                     offer_text,
                     reply_markup=keyboard,
+                    parse_mode="Markdown",
                 )
         else:
             await bot.send_message(
                 telegram_id,
                 offer_text,
                 reply_markup=keyboard,
+                parse_mode="Markdown",
             )
 
         await db.mark_premium_offer_shown(telegram_id)
         register_pending(telegram_id, generation_id)
-        await analytics.track(telegram_id, f"premium_offer_shown_v{variant}")
+        await analytics.track(
+            telegram_id,
+            _premium_analytics_event(showcase=showcase, action="shown", variant=variant),
+        )
     except asyncio.CancelledError:
         raise
     except Exception:

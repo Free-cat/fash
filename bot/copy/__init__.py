@@ -19,7 +19,6 @@ class Copy:
     result_caption: str
     paywall: str
     deficit: str
-    privacy_note: str
     drip_opt_out: str
     guide_caption: str
     guide_text_fallback: str
@@ -57,13 +56,18 @@ class Copy:
     style_guide_not_found: str
     premium_offer_v1: str
     premium_offer_v2: str
+    premium_showcase_offer_v1: str
+    premium_showcase_offer_v2: str
     premium_offer_preview_caption: str
     premium_offer_cross_sell: str
     premium_style_guide_failed: str
+    premium_showcase_failed: str
+    btn_style_guide_showcase: str
     shop_most_chosen: str
 
     help_text: str
     balance_text: str
+    balance_empty: str
     balance_line: str
     try_on_hint: str
     circuit_open: str
