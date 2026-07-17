@@ -48,14 +48,16 @@ def build_result_message(
         caption = f"{caption}\n\n{copy.try_another}"
         keyboard = result_keyboard(remaining, generation_id, cost=style_cost)
     elif 1 <= remaining <= 3:
+        # Hide Full styling if the user can't afford it.
+        affordable_cost = style_cost if style_cost is not None and remaining >= style_cost else None
         caption = f"{caption}\n\n{copy.low_balance.format(count=remaining)}"
-        keyboard = result_keyboard(remaining, generation_id, cost=style_cost)
+        keyboard = result_keyboard(remaining, generation_id, cost=affordable_cost)
     elif remaining == 0 and total_purchases == 0:
         caption = f"{caption}\n\n{copy.paywall}"
-        keyboard = paywall_keyboard(generation_id=generation_id, cost=style_cost)
+        keyboard = paywall_keyboard()
     elif remaining == 0 and total_purchases > 0:
         caption = f"{caption}\n\n{copy.deficit}"
-        keyboard = deficit_keyboard(generation_id=generation_id, cost=style_cost)
+        keyboard = deficit_keyboard()
     else:
         keyboard = result_keyboard(remaining, generation_id, cost=style_cost)
 

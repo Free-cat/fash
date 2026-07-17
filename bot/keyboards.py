@@ -91,7 +91,11 @@ def result_keyboard(
 ) -> InlineKeyboardMarkup:
     copy = active_copy()
     rows: list[list[InlineKeyboardButton]] = []
-    if cost is not None and generation_id > 0:
+    if (
+        cost is not None
+        and generation_id > 0
+        and balance >= cost
+    ):
         rows.append([_style_guide_button(generation_id, cost)])
     if generation_id > 0:
         rows.append(
@@ -151,6 +155,9 @@ def paywall_keyboard(
 ) -> InlineKeyboardMarkup:
     copy = active_copy()
     rows: list[list[InlineKeyboardButton]] = []
+    # Full styling only when caller passes cost AND we are not in a zero-balance
+    # upsell path. Call sites that show packs after insufficient balance must pass
+    # cost=None.
     if cost is not None and generation_id > 0:
         rows.append([_style_guide_button(generation_id, cost)])
     rows.extend(

@@ -172,15 +172,16 @@ async def style_guide_callback(
         user = await db.fetch_user(telegram_id)
         total_purchases = int(user["total_purchases"]) if user else 0
         cross_sell = _premium_cross_sell(copy, balance, cost)
+        # Paywall/deficit: only packs + invite — no Full styling CTA.
         if total_purchases == 0:
             await callback.message.answer(
                 cross_sell,
-                reply_markup=paywall_keyboard(generation_id=generation_id, cost=cost),
+                reply_markup=paywall_keyboard(),
             )
         else:
             await callback.message.answer(
                 cross_sell,
-                reply_markup=deficit_keyboard(generation_id=generation_id, cost=cost),
+                reply_markup=deficit_keyboard(),
             )
         await callback.answer()
         return
@@ -287,10 +288,11 @@ async def schedule_style_guide_offer(
         showcase = cost == 1
 
         if balance < cost:
+            # Not enough credits — sell packs only, no Full styling button.
             await bot.send_message(
                 telegram_id,
                 _premium_cross_sell(copy, balance, cost),
-                reply_markup=paywall_keyboard(generation_id=generation_id, cost=cost),
+                reply_markup=paywall_keyboard(),
             )
             return
 

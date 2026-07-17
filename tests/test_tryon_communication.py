@@ -40,6 +40,25 @@ def test_paywall_uses_paywall_keyboard_with_invite():
         for btn in row
         if btn.callback_data
     ]
-    assert callbacks[0] == "styleguide:7"
+    assert not any(c and c.startswith("styleguide:") for c in callbacks)
     assert any(c.startswith("buy:") for c in callbacks)
     assert "action:invite" in callbacks
+
+
+def test_result_hides_style_guide_when_balance_below_cost():
+    init_copy("en")
+
+    caption, keyboard = build_result_message(
+        remaining=1, total_purchases=0, generation_id=9, cost=3
+    )
+
+    assert "1 try-on(s) left" in caption
+    callbacks = [
+        btn.callback_data
+        for row in keyboard.inline_keyboard
+        for btn in row
+        if btn.callback_data
+    ]
+    assert not any(c and c.startswith("styleguide:") for c in callbacks)
+    assert "look:add_item:9" in callbacks
+    assert "action:try_another" in callbacks
